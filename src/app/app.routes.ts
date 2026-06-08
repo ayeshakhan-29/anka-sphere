@@ -15,6 +15,20 @@ export const routes: Routes = [
         path: 'projects',
         loadComponent: () => import('./pages/projects/projects').then(m => m.Projects),
       },
+      {
+        path: 'projects/:id',
+        loadComponent: () => import('./pages/project-detail/project-detail').then(m => m.ProjectDetail),
+        children: [
+          { path: '', redirectTo: 'overview', pathMatch: 'full' },
+          { path: 'overview', loadComponent: () => import('./pages/project-detail/project-overview').then(m => m.ProjectOverview) },
+          { path: 'profiling', loadComponent: () => import('./pages/project-detail/profiling/profiling').then(m => m.Profiling) },
+          { path: 'content', loadComponent: () => import('./pages/placeholder/placeholder').then(m => m.Placeholder) },
+          { path: 'design', loadComponent: () => import('./pages/placeholder/placeholder').then(m => m.Placeholder) },
+          { path: 'development', loadComponent: () => import('./pages/placeholder/placeholder').then(m => m.Placeholder) },
+          { path: 'analytics', loadComponent: () => import('./pages/placeholder/placeholder').then(m => m.Placeholder) },
+          { path: 'reporting', loadComponent: () => import('./pages/placeholder/placeholder').then(m => m.Placeholder) },
+        ],
+      },
       // Placeholders — to be built module by module
       { path: 'profiling', loadComponent: () => import('./pages/placeholder/placeholder').then(m => m.Placeholder) },
       { path: 'written-content', loadComponent: () => import('./pages/placeholder/placeholder').then(m => m.Placeholder) },

@@ -1,4 +1,4 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, signal, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet, Router } from '@angular/router';
 
 interface NavItem {
@@ -72,7 +72,7 @@ interface NavGroup {
           </svg>
         </button>
 
-        <!-- User profile -->
+        <!-- User profile + logout -->
         <div class="sidebar-user">
           <div class="user-avatar" aria-hidden="true">AK</div>
           @if (!sidebarCollapsed()) {
@@ -80,6 +80,21 @@ interface NavGroup {
               <span class="user-name">Ayesha K.</span>
               <span class="user-role">Admin</span>
             </div>
+            <button class="logout-btn" (click)="logout()" aria-label="Log out" title="Log out">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+            </button>
+          } @else {
+            <button class="logout-btn" (click)="logout()" aria-label="Log out" title="Log out">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+            </button>
           }
         </div>
 
@@ -276,6 +291,25 @@ interface NavGroup {
       font-size: 11px;
       color: rgba(255,255,255,0.4);
     }
+    .logout-btn {
+      margin-left: auto;
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: rgba(255,255,255,0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .logout-btn:hover {
+      background: rgba(239,68,68,0.15);
+      color: #FCA5A5;
+    }
 
     /* ── Main area ── */
     .main-area {
@@ -437,7 +471,13 @@ export class Shell {
     }
   ];
 
+  private router = inject(Router);
+
   protected toggleSidebar() {
     this.sidebarCollapsed.update(v => !v);
+  }
+
+  protected logout() {
+    this.router.navigate(['/login']);
   }
 }

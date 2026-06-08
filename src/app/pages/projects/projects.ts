@@ -1,5 +1,6 @@
 import { Component, signal, computed } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { Badge } from '../../ui';
 
 type PipelineStage = 'profiling' | 'content' | 'design' | 'development' | 'marketing';
 type ProjectStatus = 'active' | 'on-hold' | 'completed';
@@ -33,7 +34,7 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
 
 @Component({
   selector: 'app-projects',
-  imports: [RouterLink],
+  imports: [RouterLink, Badge],
   template: `
     <div class="projects-page">
 
@@ -79,9 +80,9 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
           >
             <div class="card-top">
               <div class="client-badge">{{ project.client.slice(0, 2).toUpperCase() }}</div>
-              <span class="status-pill" [class]="'status-' + project.status">
+              <ui-badge [variant]="statusVariant(project.status)">
                 {{ project.status === 'on-hold' ? 'On Hold' : project.status === 'completed' ? 'Completed' : 'Active' }}
-              </span>
+              </ui-badge>
             </div>
 
             <div class="card-body">
@@ -258,16 +259,6 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
       align-items: center;
       justify-content: center;
     }
-    .status-pill {
-      font-size: 11px;
-      font-weight: 600;
-      padding: 3px 9px;
-      border-radius: 20px;
-      text-transform: capitalize;
-    }
-    .status-active { background: var(--color-accent-light); color: var(--color-accent); }
-    .status-on-hold { background: var(--color-warning-light); color: var(--color-warning); }
-    .status-completed { background: var(--color-info-light); color: var(--color-info); }
 
     .card-body { display: flex; flex-direction: column; gap: 2px; }
     .project-name {
@@ -389,6 +380,11 @@ export class Projects {
 
   protected stageLabel(stage: PipelineStage) { return STAGE_LABELS[stage]; }
   protected stageColor(stage: PipelineStage) { return STAGE_COLORS[stage]; }
+  protected statusVariant(status: ProjectStatus): 'success' | 'warning' | 'info' {
+    if (status === 'active') return 'success';
+    if (status === 'on-hold') return 'warning';
+    return 'info';
+  }
 
   protected newProject() {
     // TODO: open new project modal
