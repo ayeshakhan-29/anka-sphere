@@ -1,7 +1,16 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
-import { tap } from 'rxjs/operators';
+import { tap, catchError } from 'rxjs/operators';
+import { of, throwError } from 'rxjs';
 import { ApiService } from './api.service';
+import { environment } from '../../environments/environment';
+
+const DEV_USERS: Record<string, AuthUser & { password: string }> = {
+  'admin@anka.agency':  { id: 'dev-1', email: 'admin@anka.agency',  name: 'Ayesha K.', role: 'ADMIN',     password: 'password' },
+  'james@anka.agency':  { id: 'dev-2', email: 'james@anka.agency',  name: 'James D.',  role: 'DEVELOPER', password: 'password' },
+  'sara@anka.agency':   { id: 'dev-3', email: 'sara@anka.agency',   name: 'Sara M.',   role: 'DESIGNER',  password: 'password' },
+  'liam@anka.agency':   { id: 'dev-4', email: 'liam@anka.agency',   name: 'Liam T.',   role: 'SEO',       password: 'password' },
+};
 
 export interface AuthUser {
   id: string;
@@ -30,13 +39,28 @@ export class AuthService {
 
   login(email: string, password: string) {
     return this.api.post<LoginResponse>('/auth/login', { email, password }).pipe(
-      tap((res) => {
-        localStorage.setItem('token', res.token);
-        localStorage.setItem('user', JSON.stringify(res.user));
-        this._token.set(res.token);
-        this._user.set(res.user);
+      tap((res) => this.persist(res)),
+      catchError((err) => {
+        // Backend unreachable — fall back to dev credentials in non-production
+        if (!environment.production && err.status === 0) {
+          const match = DEV_USERS[email];
+          if (match && match.password === password) {
+            const res: LoginResponse = { token: 'dev-token', user: match };
+            this.persist(res);
+            return of(res);
+          }
+          return throwError(() => ({ status: 401 }));
+        }
+        return throwError(() => err);
       }),
     );
+  }
+
+  private persist(res: LoginResponse) {
+    localStorage.setItem('token', res.token);
+    localStorage.setItem('user', JSON.stringify(res.user));
+    this._token.set(res.token);
+    this._user.set(res.user);
   }
 
   logout() {
@@ -46,6 +70,7 @@ export class AuthService {
     this._user.set(null);
     this.router.navigate(['/login']);
   }
+
 
   fetchMe() {
     return this.api.get<AuthUser>('/auth/me').pipe(
