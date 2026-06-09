@@ -541,9 +541,9 @@ const MOCK_PROJECTS: ContentProject[] = [
       border-radius: var(--radius-lg);
       padding: 16px 20px;
       display: grid;
-      grid-template-columns: 200px 80px 160px 100px 120px 120px 70px 72px auto;
+      grid-template-columns: 170px 70px 145px 88px 105px 108px 58px 62px min-content;
       align-items: center;
-      gap: 14px;
+      gap: 10px;
       transition: box-shadow 0.15s, border-color 0.15s;
     }
     .prow:hover { box-shadow: var(--shadow-raised); border-color: var(--color-border-strong); }

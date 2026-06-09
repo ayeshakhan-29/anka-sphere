@@ -524,9 +524,9 @@ const MOCK_PROJECTS: ProfilingProject[] = [
       border-radius: var(--radius-lg);
       padding: 16px 20px;
       display: grid;
-      grid-template-columns: 220px 1fr 130px 120px 120px 80px 80px auto;
+      grid-template-columns: 190px 1fr 120px 108px 108px 68px 62px min-content;
       align-items: center;
-      gap: 16px;
+      gap: 10px;
       transition: box-shadow 0.15s, border-color 0.15s;
     }
     .prow:hover { box-shadow: var(--shadow-raised); border-color: var(--color-border-strong); }
