@@ -1,6 +1,7 @@
 import { Component, signal, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-login',
@@ -53,9 +54,7 @@ import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
           </div>
 
           @if (loginError()) {
-            <div class="alert-error" role="alert">
-              Invalid email or password. Please try again.
-            </div>
+            <div class="alert-error" role="alert">{{ loginError() }}</div>
           }
 
           <button type="submit" class="btn-primary" [disabled]="loading()">
@@ -210,9 +209,10 @@ import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 export class Login {
   private fb = inject(FormBuilder);
   private router = inject(Router);
+  private auth = inject(AuthService);
 
   protected loading = signal(false);
-  protected loginError = signal(false);
+  protected loginError = signal<string | null>(null);
 
   protected form = this.fb.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
@@ -234,17 +234,15 @@ export class Login {
     if (this.form.invalid) return;
 
     this.loading.set(true);
-    this.loginError.set(false);
+    this.loginError.set(null);
 
-    // Mock auth — replace with real service later
-    setTimeout(() => {
-      const { email, password } = this.form.getRawValue();
-      if (email === 'admin@anka.agency' && password === 'password') {
-        this.router.navigate(['/app/projects']);
-      } else {
-        this.loginError.set(true);
+    const { email, password } = this.form.getRawValue();
+    this.auth.login(email, password).subscribe({
+      next: () => this.router.navigate(['/app/projects']),
+      error: (err) => {
+        this.loginError.set(err.status === 401 ? 'Invalid email or password.' : 'Something went wrong. Please try again.');
         this.loading.set(false);
-      }
-    }, 800);
+      },
+    });
   }
 }

@@ -1,5 +1,6 @@
 import { Component, computed, signal, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet, Router } from '@angular/router';
+import { AuthService } from '../../services/auth.service';
 
 interface NavItem {
   label: string;
@@ -74,11 +75,11 @@ interface NavGroup {
 
         <!-- User profile + logout -->
         <div class="sidebar-user">
-          <div class="user-avatar" aria-hidden="true">AK</div>
+          <div class="user-avatar" aria-hidden="true">{{ userInitials() }}</div>
           @if (!sidebarCollapsed()) {
             <div class="user-info">
-              <span class="user-name">Ayesha K.</span>
-              <span class="user-role">Admin</span>
+              <span class="user-name">{{ currentUser()?.name ?? 'User' }}</span>
+              <span class="user-role">{{ currentUser()?.role ?? '' }}</span>
             </div>
             <button class="logout-btn" (click)="logout()" aria-label="Log out" title="Log out">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -472,12 +473,19 @@ export class Shell {
   ];
 
   private router = inject(Router);
+  private auth = inject(AuthService);
+
+  protected currentUser = this.auth.user;
+  protected userInitials = computed(() => {
+    const name = this.auth.user()?.name ?? '';
+    return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  });
 
   protected toggleSidebar() {
     this.sidebarCollapsed.update(v => !v);
   }
 
   protected logout() {
-    this.router.navigate(['/login']);
+    this.auth.logout();
   }
 }
