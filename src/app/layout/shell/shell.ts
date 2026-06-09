@@ -1,5 +1,7 @@
-import { Component, computed, signal, inject } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet, Router } from '@angular/router';
+import { Component, computed, signal, inject, ViewChild, ElementRef, OnInit, OnDestroy } from '@angular/core';
+import { RouterLink, RouterLinkActive, RouterOutlet, Router, NavigationStart, NavigationEnd } from '@angular/router';
+import { Subscription } from 'rxjs';
+import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 
 interface NavItem {
@@ -120,7 +122,7 @@ interface NavGroup {
         </header>
 
         <!-- Page content -->
-        <main class="page-content" id="main-content">
+        <main class="page-content" id="main-content" #pageContent>
           <router-outlet />
         </main>
 
@@ -370,8 +372,13 @@ interface NavGroup {
     }
   `]
 })
-export class Shell {
+export class Shell implements OnInit, OnDestroy {
+  @ViewChild('pageContent') private pageContent!: ElementRef<HTMLElement>;
+
   protected sidebarCollapsed = signal(false);
+
+  private savedScroll = 0;
+  private routerSub!: Subscription;
 
   protected pageTitle = computed(() => {
     const url = window.location.pathname;
@@ -474,6 +481,27 @@ export class Shell {
 
   private router = inject(Router);
   private auth = inject(AuthService);
+
+  ngOnInit() {
+    this.routerSub = this.router.events.subscribe(event => {
+      if (event instanceof NavigationStart) {
+        this.savedScroll = this.pageContent?.nativeElement?.scrollTop ?? 0;
+      }
+      if (event instanceof NavigationEnd) {
+        // Restore on same-page tab switches; reset only on top-level page changes
+        const el = this.pageContent?.nativeElement;
+        if (!el) return;
+        const isTopLevel = ['projects', 'profiling', 'written-content', 'design', 'development',
+          'analytics', 'content-marketing', 'social', 'paid', 'seo', 'reporting']
+          .some(p => event.urlAfterRedirects === `/app/${p}`);
+        el.scrollTop = isTopLevel ? 0 : this.savedScroll;
+      }
+    });
+  }
+
+  ngOnDestroy() {
+    this.routerSub?.unsubscribe();
+  }
 
   protected currentUser = this.auth.user;
   protected userInitials = computed(() => {
