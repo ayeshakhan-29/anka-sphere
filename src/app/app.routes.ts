@@ -25,7 +25,7 @@ export const routes: Routes = [
           { path: 'overview',     loadComponent: () => import('./pages/project-detail/project-overview').then(m => m.ProjectOverview) },
           { path: 'profiling',    loadComponent: () => import('./pages/project-detail/profiling/profiling').then(m => m.Profiling) },
           { path: 'content',      loadComponent: () => import('./pages/project-detail/written-content/written-content').then(m => m.WrittenContent) },
-          { path: 'design',       loadComponent: () => import('./pages/placeholder/placeholder').then(m => m.Placeholder) },
+          { path: 'design',       loadComponent: () => import('./pages/project-detail/design/design').then(m => m.DesignModule) },
           { path: 'development',  loadComponent: () => import('./pages/placeholder/placeholder').then(m => m.Placeholder) },
           { path: 'analytics',    loadComponent: () => import('./pages/placeholder/placeholder').then(m => m.Placeholder) },
           { path: 'reporting',    loadComponent: () => import('./pages/placeholder/placeholder').then(m => m.Placeholder) },

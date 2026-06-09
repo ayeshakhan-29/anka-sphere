@@ -1,0 +1,715 @@
+import { Component, signal, computed, inject } from '@angular/core';
+import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { Badge } from '../../../ui';
+
+type TabId = 'brief' | 'kanban' | 'assets' | 'gate';
+type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE';
+type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH';
+type AssetType = 'IMAGE' | 'VIDEO' | 'FONT' | 'DOCUMENT' | 'OTHER';
+
+interface DesignTask {
+  id: string;
+  title: string;
+  description: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  assigneeName: string;
+  dueDate: string;
+}
+
+interface DesignAsset {
+  id: string;
+  name: string;
+  type: AssetType;
+  url: string;
+  thumbnailUrl: string;
+  version: number;
+  notes: string;
+  approvedAt: string | null;
+}
+
+const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
+  { id: 'TODO',        label: 'To Do',      color: 'var(--color-text-muted)' },
+  { id: 'IN_PROGRESS', label: 'In Progress', color: 'var(--color-info)' },
+  { id: 'IN_REVIEW',   label: 'In Review',   color: 'var(--color-warning)' },
+  { id: 'DONE',        label: 'Done',        color: 'var(--color-accent)' },
+];
+
+@Component({
+  selector: 'app-design',
+  imports: [ReactiveFormsModule, Badge],
+  template: `
+    <div class="design-wrap">
+
+      <!-- Header -->
+      <div class="section-header">
+        <div class="section-title-row">
+          <div>
+            <h3 class="section-title">Design</h3>
+            <p class="section-sub">Stage 3 of 5 — Product Modelling &nbsp;·&nbsp; <span class="gate-pill soft">Soft Gate</span></p>
+          </div>
+          <ui-badge [variant]="stageComplete() ? 'success' : 'warning'">
+            {{ stageComplete() ? 'Complete' : 'In Progress' }}
+          </ui-badge>
+        </div>
+
+        <div class="tab-nav" role="tablist" aria-label="Design sections">
+          @for (tab of tabs; track tab.id) {
+            <button
+              role="tab"
+              class="tab-btn"
+              [class.active]="activeTab() === tab.id"
+              [attr.aria-selected]="activeTab() === tab.id"
+              (click)="activeTab.set(tab.id)"
+            >
+              {{ tab.label }}
+              @if (tab.badge()) {
+                <span class="tab-badge">{{ tab.badge() }}</span>
+              }
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="tab-panels">
+
+        <!-- Brief tab -->
+        @if (activeTab() === 'brief') {
+          <section aria-label="Design Brief" [formGroup]="briefForm">
+            <div class="form-grid">
+              <div class="field span-full">
+                <label class="field-label" for="design-brief">Design Brief <span class="req" aria-hidden="true">*</span></label>
+                <textarea id="design-brief" class="field-textarea" formControlName="brief" rows="5"
+                  placeholder="Describe the visual direction, design goals, key screens or pages, and any constraints or requirements."></textarea>
+              </div>
+              <div class="field span-full">
+                <label class="field-label" for="style-guide">Style Guide Notes</label>
+                <textarea id="style-guide" class="field-textarea" formControlName="styleGuide" rows="3"
+                  placeholder="Spacing system, component patterns, colour usage rules, icon set, grid system."></textarea>
+              </div>
+              <div class="field span-full">
+                <label class="field-label" for="figma-url">Figma File URL</label>
+                <input id="figma-url" class="field-input" type="url" formControlName="figmaUrl"
+                  placeholder="https://www.figma.com/file/…" />
+                @if (briefForm.controls.figmaUrl.value) {
+                  <a class="figma-link" [href]="briefForm.controls.figmaUrl.value" target="_blank" rel="noopener noreferrer">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    Open in Figma
+                  </a>
+                }
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn-save" type="button" (click)="saveBrief()">Save Brief</button>
+            </div>
+          </section>
+        }
+
+        <!-- Kanban tab -->
+        @if (activeTab() === 'kanban') {
+          <section aria-label="Design Kanban Board">
+            <div class="kanban-toolbar">
+              <div class="task-stats">
+                <span class="stat"><strong>{{ tasks().length }}</strong> tasks</span>
+                <span class="stat-divider" aria-hidden="true">·</span>
+                <span class="stat"><strong>{{ doneTasks() }}</strong> done</span>
+                @if (tasks().length > 0) {
+                  <span class="stat-divider" aria-hidden="true">·</span>
+                  <span class="stat"><strong>{{ progressPct() }}%</strong> complete</span>
+                }
+              </div>
+              <button class="btn-add" type="button" (click)="addTask()" aria-label="Add task">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Task
+              </button>
+            </div>
+
+            <!-- Progress bar -->
+            @if (tasks().length > 0) {
+              <div class="progress-row" aria-label="Overall progress">
+                <div class="progress-bar">
+                  <div class="progress-fill" [style.width.%]="progressPct()"></div>
+                </div>
+              </div>
+            }
+
+            <!-- Board -->
+            <div class="kanban-board" role="region" aria-label="Kanban board">
+              @for (col of columns; track col.id) {
+                <div class="kanban-col">
+                  <div class="col-header">
+                    <div class="col-dot" [style.background]="col.color"></div>
+                    <span class="col-label">{{ col.label }}</span>
+                    <span class="col-count">{{ tasksByStatus(col.id).length }}</span>
+                  </div>
+                  <div class="col-body">
+                    @for (task of tasksByStatus(col.id); track task.id) {
+                      <div class="task-card" [class]="'priority-' + task.priority.toLowerCase()">
+                        <div class="task-card-top">
+                          <span class="task-priority-dot" [class]="'p-' + task.priority.toLowerCase()" aria-label="{{ task.priority }} priority"></span>
+                          <div class="task-actions">
+                            <button class="task-move-btn" type="button" (click)="cycleStatus(task.id)" aria-label="Advance status">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+                            </button>
+                            <button class="task-del-btn" type="button" (click)="deleteTask(task.id)" aria-label="Delete task">
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            </button>
+                          </div>
+                        </div>
+                        <input
+                          class="task-title-input"
+                          type="text"
+                          [value]="task.title"
+                          (input)="updateTask(task.id, 'title', $any($event.target).value)"
+                          placeholder="Task title"
+                          aria-label="Task title"
+                        />
+                        @if (task.description || editingDesc() === task.id) {
+                          <textarea
+                            class="task-desc-input"
+                            [value]="task.description"
+                            (input)="updateTask(task.id, 'description', $any($event.target).value)"
+                            (focus)="editingDesc.set(task.id)"
+                            (blur)="editingDesc.set(null)"
+                            rows="2"
+                            placeholder="Add description…"
+                            aria-label="Task description"
+                          ></textarea>
+                        } @else {
+                          <button class="task-add-desc" type="button" (click)="editingDesc.set(task.id)">+ description</button>
+                        }
+                        <div class="task-card-footer">
+                          <select
+                            class="task-priority-select"
+                            [value]="task.priority"
+                            (change)="updateTask(task.id, 'priority', $any($event.target).value)"
+                            aria-label="Task priority"
+                          >
+                            <option value="LOW">Low</option>
+                            <option value="MEDIUM">Medium</option>
+                            <option value="HIGH">High</option>
+                          </select>
+                          @if (task.assigneeName) {
+                            <span class="task-assignee">{{ task.assigneeName }}</span>
+                          }
+                        </div>
+                      </div>
+                    } @empty {
+                      <div class="col-empty">Drop tasks here</div>
+                    }
+                    <!-- Quick add at bottom of TODO column -->
+                    @if (col.id === 'TODO') {
+                      <button class="col-add-btn" type="button" (click)="addTask()" aria-label="Add task to To Do">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Add task
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          </section>
+        }
+
+        <!-- Assets tab -->
+        @if (activeTab() === 'assets') {
+          <section aria-label="Asset Library">
+            <div class="assets-toolbar">
+              <div class="asset-filters">
+                @for (filter of assetFilters; track filter.value) {
+                  <button
+                    class="filter-btn"
+                    [class.active]="assetFilter() === filter.value"
+                    type="button"
+                    (click)="assetFilter.set(filter.value)"
+                  >{{ filter.label }}</button>
+                }
+              </div>
+              <button class="btn-add" type="button" (click)="addingAsset.set(true)" aria-label="Add asset">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Asset
+              </button>
+            </div>
+
+            <!-- Add asset form -->
+            @if (addingAsset()) {
+              <div class="asset-form-card" [formGroup]="assetForm">
+                <p class="asset-form-title">New Asset</p>
+                <div class="asset-form-grid">
+                  <div class="field">
+                    <label class="field-label" for="asset-name">Name <span class="req" aria-hidden="true">*</span></label>
+                    <input id="asset-name" class="field-input" type="text" formControlName="name" placeholder="e.g. Hero Banner v2" />
+                  </div>
+                  <div class="field">
+                    <label class="field-label" for="asset-type">Type</label>
+                    <select id="asset-type" class="field-select" formControlName="type">
+                      <option value="IMAGE">Image</option>
+                      <option value="VIDEO">Video</option>
+                      <option value="FONT">Font</option>
+                      <option value="DOCUMENT">Document</option>
+                      <option value="OTHER">Other</option>
+                    </select>
+                  </div>
+                  <div class="field span-full">
+                    <label class="field-label" for="asset-url">URL <span class="req" aria-hidden="true">*</span></label>
+                    <input id="asset-url" class="field-input" type="url" formControlName="url" placeholder="https://…" />
+                  </div>
+                  <div class="field span-full">
+                    <label class="field-label" for="asset-notes">Notes</label>
+                    <input id="asset-notes" class="field-input" type="text" formControlName="notes" placeholder="Version notes, usage guidelines, etc." />
+                  </div>
+                </div>
+                <div class="asset-form-actions">
+                  <button class="btn-ghost" type="button" (click)="cancelAsset()">Cancel</button>
+                  <button class="btn-save" type="button" (click)="saveAsset()">Add Asset</button>
+                </div>
+              </div>
+            }
+
+            <!-- Asset grid -->
+            <div class="asset-grid" role="list">
+              @for (asset of filteredAssets(); track asset.id) {
+                <div class="asset-card" role="listitem">
+                  <div class="asset-thumb" [class]="'type-' + asset.type.toLowerCase()">
+                    @if (asset.thumbnailUrl) {
+                      <img [src]="asset.thumbnailUrl" [alt]="asset.name" loading="lazy" />
+                    } @else {
+                      <span class="asset-type-icon" aria-hidden="true">{{ assetIcon(asset.type) }}</span>
+                    }
+                    @if (asset.approvedAt) {
+                      <span class="asset-approved-badge" aria-label="Approved">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                      </span>
+                    }
+                  </div>
+                  <div class="asset-info">
+                    <span class="asset-name">{{ asset.name }}</span>
+                    <span class="asset-meta">v{{ asset.version }} · {{ asset.type.toLowerCase() }}</span>
+                    @if (asset.notes) {
+                      <span class="asset-notes">{{ asset.notes }}</span>
+                    }
+                  </div>
+                  <div class="asset-actions">
+                    <a class="asset-link-btn" [href]="asset.url" target="_blank" rel="noopener noreferrer" aria-label="Open asset">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    </a>
+                    @if (!asset.approvedAt) {
+                      <button class="asset-approve-btn" type="button" (click)="approveAsset(asset.id)" aria-label="Approve asset">Approve</button>
+                    }
+                    <button class="asset-del-btn" type="button" (click)="deleteAsset(asset.id)" aria-label="Delete asset">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+                    </button>
+                  </div>
+                </div>
+              } @empty {
+                <div class="empty-hint">No assets yet. Add images, fonts, documents, or links to design files.</div>
+              }
+            </div>
+          </section>
+        }
+
+        <!-- Gate tab -->
+        @if (activeTab() === 'gate') {
+          <section aria-label="Soft Gate">
+            <div class="gate-wrap">
+
+              <div class="gate-info">
+                <div class="soft-gate-banner">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  <div>
+                    <p class="banner-title">Soft Gate</p>
+                    <p class="banner-desc">Unlike a Hard Gate, a Soft Gate allows you to proceed to Development even if some tasks are incomplete. Any warnings will be shown below.</p>
+                  </div>
+                </div>
+
+                <p class="checklist-title">Gate Checklist</p>
+                <ul class="checklist" role="list">
+                  <li class="check-item" [class.ok]="briefForm.valid">
+                    <span class="check-icon" [class.ok]="briefForm.valid" aria-hidden="true">
+                      @if (briefForm.valid) {
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                      }
+                    </span>
+                    Design brief completed
+                  </li>
+                  <li class="check-item" [class.ok]="tasks().length > 0" [class.warn]="tasks().length > 0 && doneTasks() < tasks().length">
+                    <span class="check-icon" [class.ok]="doneTasks() === tasks().length && tasks().length > 0" [class.warn]="tasks().length > 0 && doneTasks() < tasks().length" aria-hidden="true">
+                      @if (doneTasks() === tasks().length && tasks().length > 0) {
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                      } @else if (tasks().length > 0) {
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      }
+                    </span>
+                    Design tasks: {{ doneTasks() }}/{{ tasks().length }} done
+                    @if (tasks().length > 0 && doneTasks() < tasks().length) {
+                      <span class="warn-note">(warning — can still proceed)</span>
+                    }
+                  </li>
+                  <li class="check-item" [class.ok]="approvedAssets() > 0">
+                    <span class="check-icon" [class.ok]="approvedAssets() > 0" aria-hidden="true">
+                      @if (approvedAssets() > 0) {
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                      }
+                    </span>
+                    Assets: {{ approvedAssets() }} approved
+                  </li>
+                </ul>
+              </div>
+
+              <div class="gate-action">
+                <div class="gate-status-card" [class.ready]="gateReady()">
+                  @if (gateReady()) {
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    <div>
+                      <p class="gate-card-title">Ready to proceed</p>
+                      <p class="gate-card-desc">
+                        @if (doneTasks() < tasks().length && tasks().length > 0) {
+                          {{ tasks().length - doneTasks() }} task(s) still open — proceeding with warnings.
+                        } @else {
+                          All requirements met. Design can be approved.
+                        }
+                      </p>
+                    </div>
+                  } @else {
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <div>
+                      <p class="gate-card-title">Brief required</p>
+                      <p class="gate-card-desc">Complete the design brief before approving this stage.</p>
+                    </div>
+                  }
+                </div>
+
+                <button
+                  class="btn-approve"
+                  type="button"
+                  [disabled]="!gateReady() || gateSubmitting()"
+                  (click)="approveGate()"
+                >
+                  @if (gateSubmitting()) {
+                    <span class="spinner" aria-hidden="true"></span>
+                    Approving…
+                  } @else {
+                    Approve Design & Unlock Development
+                  }
+                </button>
+
+                @if (gateError()) {
+                  <p class="gate-error" role="alert">{{ gateError() }}</p>
+                }
+                @if (gateSuccess()) {
+                  <p class="gate-success" role="status">Development stage unlocked successfully.</p>
+                }
+              </div>
+
+            </div>
+          </section>
+        }
+
+      </div>
+    </div>
+  `,
+  styles: [`
+    .design-wrap { display: flex; flex-direction: column; gap: 0; }
+
+    .section-header { margin-bottom: 0; }
+    .section-title-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
+    .section-title { font-family: var(--font-display); font-size: 18px; font-weight: 400; color: var(--color-text); margin: 0 0 4px; }
+    .section-sub { font-size: 12.5px; color: var(--color-text-muted); margin: 0; }
+    .gate-pill { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; }
+    .gate-pill.soft { background: #FEF3C7; color: #D97706; }
+
+    .tab-nav { display: flex; gap: 2px; border-bottom: 1px solid var(--color-border); margin: 0 -24px; padding: 0 24px; }
+    .tab-btn {
+      display: flex; align-items: center; gap: 6px; padding: 8px 14px; border: none;
+      background: transparent; font-family: var(--font-sans); font-size: 13px; font-weight: 500;
+      color: var(--color-text-secondary); cursor: pointer; border-bottom: 2px solid transparent;
+      margin-bottom: -1px; transition: color 0.15s, border-color 0.15s; white-space: nowrap;
+    }
+    .tab-btn:hover { color: var(--color-text); }
+    .tab-btn.active { color: var(--color-text); border-bottom-color: var(--color-accent); }
+    .tab-badge { background: var(--color-accent-light); color: var(--color-accent); font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px; }
+
+    .tab-panels { padding-top: 24px; }
+
+    /* Brief */
+    .form-grid { display: flex; flex-direction: column; gap: 16px; }
+    .field { display: flex; flex-direction: column; }
+    .field-label { font-size: 12.5px; font-weight: 500; color: var(--color-text); margin-bottom: 6px; }
+    .req { color: var(--color-destructive); }
+    .field-input, .field-select {
+      height: 36px; padding: 0 10px; border: 1px solid var(--color-border-strong);
+      border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 13px;
+      color: var(--color-text); background: var(--color-surface); outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .field-input:focus, .field-select:focus { border-color: var(--color-accent); box-shadow: 0 0 0 3px rgba(22,163,74,0.1); }
+    .field-textarea {
+      padding: 8px 10px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-md);
+      font-family: var(--font-sans); font-size: 13px; color: var(--color-text); background: var(--color-surface);
+      resize: vertical; outline: none; line-height: 1.6; transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .field-textarea:focus { border-color: var(--color-accent); box-shadow: 0 0 0 3px rgba(22,163,74,0.1); }
+    .figma-link {
+      display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; font-size: 12.5px;
+      color: var(--color-info); text-decoration: none;
+    }
+    .figma-link:hover { text-decoration: underline; }
+    .form-actions { display: flex; justify-content: flex-end; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--color-border); }
+    .btn-save { height: 36px; padding: 0 20px; background: var(--color-accent); color: #fff; border: none; border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+    .btn-save:hover { background: var(--color-accent-hover); }
+
+    /* Kanban toolbar */
+    .kanban-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .task-stats { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--color-text-secondary); }
+    .task-stats strong { color: var(--color-text); font-weight: 600; }
+    .stat-divider { color: var(--color-border-strong); }
+    .btn-add { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 13px; font-weight: 500; color: var(--color-text); cursor: pointer; transition: background 0.15s; }
+    .btn-add:hover { background: var(--color-border); }
+
+    .progress-row { margin-bottom: 16px; }
+    .progress-bar { height: 5px; background: var(--color-surface-raised); border-radius: 10px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--color-accent); border-radius: 10px; transition: width 0.3s ease; }
+
+    /* Board */
+    .kanban-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .kanban-col { display: flex; flex-direction: column; gap: 8px; }
+    .col-header { display: flex; align-items: center; gap: 7px; padding: 0 0 8px; border-bottom: 1px solid var(--color-border); }
+    .col-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .col-label { font-size: 12px; font-weight: 600; color: var(--color-text); flex: 1; }
+    .col-count { font-size: 11px; font-weight: 600; background: var(--color-surface-raised); color: var(--color-text-muted); padding: 1px 6px; border-radius: 10px; }
+    .col-body { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+    .col-empty { font-size: 12px; color: var(--color-text-muted); text-align: center; padding: 20px 0; border: 1.5px dashed var(--color-border); border-radius: var(--radius-md); }
+
+    /* Task cards */
+    .task-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+    .task-card.priority-high { border-left: 3px solid var(--color-destructive); }
+    .task-card.priority-medium { border-left: 3px solid var(--color-warning); }
+    .task-card.priority-low { border-left: 3px solid var(--color-border-strong); }
+    .task-card-top { display: flex; align-items: center; justify-content: space-between; }
+    .task-priority-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .task-priority-dot.p-high { background: var(--color-destructive); }
+    .task-priority-dot.p-medium { background: var(--color-warning); }
+    .task-priority-dot.p-low { background: var(--color-border-strong); }
+    .task-actions { display: flex; gap: 2px; }
+    .task-move-btn, .task-del-btn { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border: none; background: none; border-radius: 4px; cursor: pointer; color: var(--color-text-muted); transition: background 0.12s, color 0.12s; }
+    .task-move-btn:hover { background: var(--color-accent-light); color: var(--color-accent); }
+    .task-del-btn:hover { background: var(--color-destructive-light); color: var(--color-destructive); }
+    .task-title-input { font-family: var(--font-sans); font-size: 13px; font-weight: 500; color: var(--color-text); border: none; outline: none; background: transparent; width: 100%; padding: 0; }
+    .task-title-input::placeholder { color: var(--color-text-muted); }
+    .task-desc-input { font-family: var(--font-sans); font-size: 12px; color: var(--color-text-secondary); border: none; outline: none; background: transparent; width: 100%; padding: 0; resize: none; line-height: 1.5; }
+    .task-desc-input::placeholder { color: var(--color-text-muted); }
+    .task-add-desc { font-family: var(--font-sans); font-size: 11.5px; color: var(--color-text-muted); background: none; border: none; padding: 0; cursor: pointer; text-align: left; }
+    .task-add-desc:hover { color: var(--color-text-secondary); }
+    .task-card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
+    .task-priority-select { font-family: var(--font-sans); font-size: 11px; color: var(--color-text-muted); background: none; border: none; outline: none; cursor: pointer; padding: 0; }
+    .task-assignee { font-size: 11px; color: var(--color-text-muted); }
+    .col-add-btn { display: flex; align-items: center; gap: 5px; width: 100%; padding: 7px; background: none; border: 1.5px dashed var(--color-border); border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 12px; color: var(--color-text-muted); cursor: pointer; justify-content: center; transition: border-color 0.15s, color 0.15s; }
+    .col-add-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
+
+    /* Assets */
+    .assets-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .asset-filters { display: flex; gap: 4px; }
+    .filter-btn { height: 30px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: 20px; font-family: var(--font-sans); font-size: 12.5px; color: var(--color-text-secondary); background: var(--color-surface); cursor: pointer; transition: all 0.15s; }
+    .filter-btn:hover { border-color: var(--color-border-strong); color: var(--color-text); }
+    .filter-btn.active { background: var(--color-sidebar); color: #fff; border-color: var(--color-sidebar); }
+
+    .asset-form-card { background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 18px 20px; margin-bottom: 16px; }
+    .asset-form-title { font-size: 13.5px; font-weight: 600; color: var(--color-text); margin: 0 0 14px; }
+    .asset-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+    .span-full { grid-column: 1 / -1; }
+    .asset-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .btn-ghost { height: 34px; padding: 0 16px; background: none; border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 13px; color: var(--color-text-secondary); cursor: pointer; transition: background 0.15s; }
+    .btn-ghost:hover { background: var(--color-surface-raised); }
+
+    .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+    .asset-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; transition: box-shadow 0.15s; }
+    .asset-card:hover { box-shadow: var(--shadow-raised); }
+    .asset-thumb {
+      height: 120px; display: flex; align-items: center; justify-content: center;
+      background: var(--color-surface-raised); position: relative;
+    }
+    .asset-thumb.type-image { background: #EFF6FF; }
+    .asset-thumb.type-video { background: #FFF7ED; }
+    .asset-thumb.type-font  { background: #F5F3FF; }
+    .asset-thumb.type-document { background: #F0FDF4; }
+    .asset-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .asset-type-icon { font-size: 32px; }
+    .asset-approved-badge { position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; border-radius: 50%; background: var(--color-accent); color: #fff; display: flex; align-items: center; justify-content: center; }
+    .asset-info { padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+    .asset-name { font-size: 13px; font-weight: 500; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .asset-meta { font-size: 11.5px; color: var(--color-text-muted); }
+    .asset-notes { font-size: 11.5px; color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .asset-actions { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-top: 1px solid var(--color-border); }
+    .asset-link-btn { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: var(--radius-sm); color: var(--color-text-secondary); transition: background 0.15s; }
+    .asset-link-btn:hover { background: var(--color-surface-raised); color: var(--color-text); }
+    .asset-approve-btn { flex: 1; height: 26px; background: var(--color-accent-light); color: var(--color-accent); border: none; border-radius: var(--radius-sm); font-family: var(--font-sans); font-size: 11.5px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+    .asset-approve-btn:hover { background: var(--color-accent); color: #fff; }
+    .asset-del-btn { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: none; border: none; border-radius: var(--radius-sm); color: var(--color-text-muted); cursor: pointer; transition: background 0.15s, color 0.15s; }
+    .asset-del-btn:hover { background: var(--color-destructive-light); color: var(--color-destructive); }
+
+    /* Gate */
+    .gate-wrap { display: grid; grid-template-columns: 1fr 340px; gap: 24px; }
+    .soft-gate-banner { display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px; background: #FEF3C7; border: 1px solid #FDE68A; border-radius: var(--radius-lg); margin-bottom: 20px; color: #92400E; }
+    .banner-title { font-size: 13.5px; font-weight: 600; margin: 0 0 3px; }
+    .banner-desc { font-size: 12.5px; margin: 0; }
+    .checklist-title { font-size: 13.5px; font-weight: 600; color: var(--color-text); margin: 0 0 14px; }
+    .checklist { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
+    .check-item { display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px; color: var(--color-text-muted); }
+    .check-item.ok { color: var(--color-text-secondary); }
+    .check-icon { width: 22px; height: 22px; min-width: 22px; border-radius: 50%; border: 1.5px solid var(--color-border-strong); background: var(--color-surface); display: flex; align-items: center; justify-content: center; color: transparent; margin-top: 1px; }
+    .check-icon.ok { background: var(--color-accent); border-color: var(--color-accent); color: #fff; }
+    .check-icon.warn { background: #FEF3C7; border-color: var(--color-warning); color: var(--color-warning); }
+    .warn-note { font-size: 11.5px; color: var(--color-warning); margin-left: 4px; }
+    .gate-action { display: flex; flex-direction: column; gap: 12px; }
+    .gate-status-card { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface-raised); color: var(--color-text-muted); }
+    .gate-status-card.ready { background: var(--color-accent-light); border-color: var(--color-accent); color: var(--color-accent); }
+    .gate-card-title { font-size: 13.5px; font-weight: 600; margin: 0 0 3px; color: inherit; }
+    .gate-card-desc { font-size: 12.5px; margin: 0; color: inherit; opacity: 0.85; }
+    .btn-approve { height: 40px; padding: 0 20px; background: var(--color-accent); color: #fff; border: none; border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 13.5px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.15s; }
+    .btn-approve:hover:not(:disabled) { background: var(--color-accent-hover); }
+    .btn-approve:disabled { opacity: 0.5; cursor: not-allowed; }
+    .gate-error { font-size: 12.5px; color: var(--color-destructive); margin: 0; }
+    .gate-success { font-size: 12.5px; color: var(--color-accent); font-weight: 500; margin: 0; }
+    .spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .empty-hint { font-size: 13px; color: var(--color-text-muted); padding: 16px 0; }
+  `]
+})
+export class DesignModule {
+  private fb = inject(FormBuilder);
+
+  protected activeTab = signal<TabId>('brief');
+
+  protected tabs = [
+    { id: 'brief'  as TabId, label: 'Design Brief', badge: () => null },
+    { id: 'kanban' as TabId, label: 'Kanban',       badge: () => this.tasks().length > 0 ? this.tasks().length : null },
+    { id: 'assets' as TabId, label: 'Assets',       badge: () => this.assets().length > 0 ? this.assets().length : null },
+    { id: 'gate'   as TabId, label: 'Soft Gate',    badge: () => null },
+  ];
+
+  protected columns = COLUMNS;
+
+  protected briefForm = this.fb.group({
+    brief:      ['', Validators.required],
+    styleGuide: [''],
+    figmaUrl:   [''],
+  });
+
+  protected tasks = signal<DesignTask[]>([
+    { id: '1', title: 'Wireframes — Home & About', description: 'Low-fi wireframes for review', status: 'DONE',        priority: 'HIGH',   assigneeName: 'Sara M.', dueDate: '' },
+    { id: '2', title: 'Brand style tile',          description: '',                              status: 'DONE',        priority: 'HIGH',   assigneeName: 'Sara M.', dueDate: '' },
+    { id: '3', title: 'High-fidelity mockups',     description: 'Full colour mockups all pages', status: 'IN_PROGRESS', priority: 'HIGH',   assigneeName: 'Sara M.', dueDate: '' },
+    { id: '4', title: 'Mobile responsive designs', description: '',                              status: 'TODO',        priority: 'MEDIUM', assigneeName: '',         dueDate: '' },
+    { id: '5', title: 'Prototype & interactions',  description: '',                              status: 'TODO',        priority: 'LOW',    assigneeName: '',         dueDate: '' },
+  ]);
+
+  protected assets = signal<DesignAsset[]>([
+    { id: '1', name: 'Brand Logo Suite',     type: 'IMAGE',    url: '#', thumbnailUrl: '', version: 2, notes: 'SVG + PNG variants', approvedAt: '2026-05-01' },
+    { id: '2', name: 'Colour Palette',       type: 'DOCUMENT', url: '#', thumbnailUrl: '', version: 1, notes: '',                  approvedAt: null },
+    { id: '3', name: 'Inter Font Files',     type: 'FONT',     url: '#', thumbnailUrl: '', version: 1, notes: 'Variable font',     approvedAt: '2026-05-02' },
+  ]);
+
+  protected editingDesc = signal<string | null>(null);
+  protected assetFilter = signal<string>('ALL');
+  protected addingAsset = signal(false);
+  protected gateSubmitting = signal(false);
+  protected gateError = signal<string | null>(null);
+  protected gateSuccess = signal(false);
+
+  protected assetFilters = [
+    { label: 'All',      value: 'ALL' },
+    { label: 'Images',   value: 'IMAGE' },
+    { label: 'Videos',   value: 'VIDEO' },
+    { label: 'Fonts',    value: 'FONT' },
+    { label: 'Docs',     value: 'DOCUMENT' },
+  ];
+
+  protected assetForm = this.fb.group({
+    name:  ['', Validators.required],
+    type:  ['IMAGE'],
+    url:   ['', Validators.required],
+    notes: [''],
+  });
+
+  protected tasksByStatus(status: TaskStatus) {
+    return this.tasks().filter(t => t.status === status);
+  }
+
+  protected doneTasks = computed(() => this.tasks().filter(t => t.status === 'DONE').length);
+  protected progressPct = computed(() => {
+    const total = this.tasks().length;
+    return total === 0 ? 0 : Math.round((this.doneTasks() / total) * 100);
+  });
+  protected approvedAssets = computed(() => this.assets().filter(a => a.approvedAt).length);
+  protected filteredAssets = computed(() => {
+    const f = this.assetFilter();
+    return f === 'ALL' ? this.assets() : this.assets().filter(a => a.type === f);
+  });
+  protected stageComplete = computed(() => this.briefForm.valid && this.gateSuccess());
+  protected gateReady = computed(() => this.briefForm.valid);
+
+  protected addTask() {
+    const id = Date.now().toString();
+    this.tasks.update(list => [...list, { id, title: '', description: '', status: 'TODO', priority: 'MEDIUM', assigneeName: '', dueDate: '' }]);
+  }
+
+  protected deleteTask(id: string) {
+    this.tasks.update(list => list.filter(t => t.id !== id));
+  }
+
+  protected updateTask(id: string, field: keyof DesignTask, value: string) {
+    this.tasks.update(list => list.map(t => t.id === id ? { ...t, [field]: value } : t));
+  }
+
+  protected cycleStatus(id: string) {
+    const order: TaskStatus[] = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
+    this.tasks.update(list => list.map(t => {
+      if (t.id !== id) return t;
+      const next = order[(order.indexOf(t.status) + 1) % order.length];
+      return { ...t, status: next };
+    }));
+  }
+
+  protected assetIcon(type: AssetType): string {
+    const icons: Record<AssetType, string> = { IMAGE: '🖼️', VIDEO: '🎬', FONT: '🔤', DOCUMENT: '📄', OTHER: '📎' };
+    return icons[type];
+  }
+
+  protected approveAsset(id: string) {
+    this.assets.update(list => list.map(a => a.id === id ? { ...a, approvedAt: new Date().toISOString() } : a));
+  }
+
+  protected deleteAsset(id: string) {
+    this.assets.update(list => list.filter(a => a.id !== id));
+  }
+
+  protected saveAsset() {
+    this.assetForm.markAllAsTouched();
+    if (this.assetForm.invalid) return;
+    const v = this.assetForm.getRawValue();
+    const id = Date.now().toString();
+    this.assets.update(list => [...list, { id, name: v.name ?? '', type: (v.type ?? 'OTHER') as AssetType, url: v.url ?? '', thumbnailUrl: '', version: 1, notes: v.notes ?? '', approvedAt: null }]);
+    this.assetForm.reset({ type: 'IMAGE' });
+    this.addingAsset.set(false);
+  }
+
+  protected cancelAsset() {
+    this.assetForm.reset({ type: 'IMAGE' });
+    this.addingAsset.set(false);
+  }
+
+  protected saveBrief() {
+    this.briefForm.markAllAsTouched();
+  }
+
+  protected approveGate() {
+    if (!this.gateReady()) return;
+    this.gateSubmitting.set(true);
+    this.gateError.set(null);
+    // TODO: call POST /projects/:id/design/complete
+    setTimeout(() => {
+      this.gateSubmitting.set(false);
+      this.gateSuccess.set(true);
+    }, 1000);
+  }
+}
