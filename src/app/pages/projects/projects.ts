@@ -1,40 +1,29 @@
-import { Component, signal, computed } from '@angular/core';
+import { Component, computed, signal, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { Badge } from '../../ui';
-
-type PipelineStage = 'profiling' | 'content' | 'design' | 'development' | 'marketing';
-type ProjectStatus = 'active' | 'on-hold' | 'completed';
-
-interface Project {
-  id: string;
-  name: string;
-  client: string;
-  stage: PipelineStage;
-  status: ProjectStatus;
-  progress: number;
-  updatedAt: string;
-  team: string[];
-}
+import { ProjectService } from '../../services/project.service';
+import { Project, ProjectStatus, PipelineStage } from '../../models/project.models';
 
 const STAGE_LABELS: Record<PipelineStage, string> = {
-  profiling: 'Project Profiling',
-  content: 'Written Content',
-  design: 'Design',
-  development: 'Development',
-  marketing: 'Marketing',
+  PROFILING:       'Project Profiling',
+  WRITTEN_CONTENT: 'Written Content',
+  DESIGN:          'Design',
+  DEVELOPMENT:     'Development',
+  MARKETING:       'Marketing',
 };
 
 const STAGE_COLORS: Record<PipelineStage, string> = {
-  profiling: '#3B82F6',
-  content: '#8B5CF6',
-  design: '#EC4899',
-  development: '#F59E0B',
-  marketing: '#16A34A',
+  PROFILING:       '#3B82F6',
+  WRITTEN_CONTENT: '#8B5CF6',
+  DESIGN:          '#EC4899',
+  DEVELOPMENT:     '#F59E0B',
+  MARKETING:       '#16A34A',
 };
 
 @Component({
   selector: 'app-projects',
-  imports: [RouterLink, Badge],
+  imports: [RouterLink, Badge, ReactiveFormsModule],
   template: `
     <div class="projects-page">
 
@@ -42,15 +31,20 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
       <div class="page-header">
         <div>
           <h2 class="heading">All Projects</h2>
-          <p class="subheading">{{ projects().length }} active client projects</p>
+          <p class="subheading">{{ projects().length }} client projects</p>
         </div>
-        <button class="btn-new" (click)="newProject()">
+        <button class="btn-new" (click)="showModal.set(true)">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
           New Project
         </button>
       </div>
+
+      <!-- Error banner -->
+      @if (error()) {
+        <div class="error-banner" role="alert">{{ error() }}</div>
+      }
 
       <!-- Filter tabs -->
       <div class="filter-tabs" role="tablist" aria-label="Filter projects">
@@ -68,67 +62,125 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
         }
       </div>
 
-      <!-- Project grid -->
-      <div class="project-grid" role="list">
-        @for (project of filtered(); track project.id) {
-          <article
-            class="project-card"
-            role="listitem"
-            [routerLink]="['/app/projects', project.id]"
-            tabindex="0"
-            [attr.aria-label]="project.name + ' — ' + project.client"
-          >
-            <div class="card-top">
-              <div class="client-badge">{{ project.client.slice(0, 2).toUpperCase() }}</div>
-              <ui-badge [variant]="statusVariant(project.status)">
-                {{ project.status === 'on-hold' ? 'On Hold' : project.status === 'completed' ? 'Completed' : 'Active' }}
-              </ui-badge>
-            </div>
-
-            <div class="card-body">
-              <h3 class="project-name">{{ project.name }}</h3>
-              <p class="project-client">{{ project.client }}</p>
-            </div>
-
-            <div class="card-stage">
-              <div class="stage-dot" [style.background]="stageColor(project.stage)"></div>
-              <span class="stage-label">{{ stageLabel(project.stage) }}</span>
-            </div>
-
-            <div class="card-progress">
-              <div class="progress-row">
-                <span class="progress-label">Progress</span>
-                <span class="progress-value">{{ project.progress }}%</span>
+      <!-- Loading -->
+      @if (loading()) {
+        <div class="loading-state" role="status" aria-label="Loading projects">
+          <div class="spinner" aria-hidden="true"></div>
+          <span>Loading projects…</span>
+        </div>
+      } @else {
+        <!-- Project grid -->
+        <div class="project-grid" role="list">
+          @for (project of filtered(); track project.id) {
+            <article
+              class="project-card"
+              role="listitem"
+              [routerLink]="['/app/projects', project.id]"
+              tabindex="0"
+              [attr.aria-label]="project.name + ' — ' + project.clientName"
+            >
+              <div class="card-top">
+                <div class="client-badge">{{ project.clientName.slice(0, 2).toUpperCase() }}</div>
+                <ui-badge [variant]="statusVariant(project.status)">
+                  {{ statusLabel(project.status) }}
+                </ui-badge>
               </div>
-              <div class="progress-bar" role="progressbar" [attr.aria-valuenow]="project.progress" aria-valuemin="0" aria-valuemax="100">
-                <div class="progress-fill" [style.width.%]="project.progress" [style.background]="stageColor(project.stage)"></div>
-              </div>
-            </div>
 
-            <div class="card-footer">
-              <div class="team-avatars" aria-label="Team members">
-                @for (member of project.team.slice(0, 3); track member) {
-                  <div class="team-avatar" [title]="member">{{ member.slice(0, 2) }}</div>
-                }
-                @if (project.team.length > 3) {
-                  <div class="team-avatar overflow">+{{ project.team.length - 3 }}</div>
-                }
+              <div class="card-body">
+                <h3 class="project-name">{{ project.name }}</h3>
+                <p class="project-client">{{ project.clientName }}</p>
               </div>
-              <span class="updated-at">{{ project.updatedAt }}</span>
-            </div>
-          </article>
-        } @empty {
-          <div class="empty-state">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" style="color: var(--color-text-muted)">
-              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-              <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-            </svg>
-            <p>No projects found</p>
-          </div>
-        }
-      </div>
 
+              <div class="card-stage">
+                <div class="stage-dot" [style.background]="stageColor(project.currentStage)"></div>
+                <span class="stage-label">{{ stageLabel(project.currentStage) }}</span>
+              </div>
+
+              <div class="card-footer">
+                <div class="team-avatars" aria-label="Team members">
+                  @for (member of project.members.slice(0, 3); track member.id) {
+                    <div class="team-avatar" [title]="member.user.name">
+                      {{ member.user.name.slice(0, 2) }}
+                    </div>
+                  }
+                  @if (project.members.length > 3) {
+                    <div class="team-avatar overflow">+{{ project.members.length - 3 }}</div>
+                  }
+                </div>
+                <span class="updated-at">{{ relativeTime(project.updatedAt) }}</span>
+              </div>
+            </article>
+          } @empty {
+            <div class="empty-state">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" style="color: var(--color-text-muted)">
+                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+              </svg>
+              <p>No projects found</p>
+            </div>
+          }
+        </div>
+      }
     </div>
+
+    <!-- New Project Modal -->
+    @if (showModal()) {
+      <div class="modal-backdrop" (click)="closeModal()" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <h3 id="modal-title" class="modal-title">New Project</h3>
+            <button class="modal-close" (click)="closeModal()" aria-label="Close">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+
+          <form [formGroup]="newProjectForm" (ngSubmit)="createProject()" class="modal-form">
+            <div class="field">
+              <label for="proj-name" class="label">Project Name <span class="required" aria-hidden="true">*</span></label>
+              <input id="proj-name" class="input" formControlName="name" placeholder="e.g. Brand Refresh & Website" />
+              @if (newProjectForm.get('name')?.invalid && newProjectForm.get('name')?.touched) {
+                <span class="field-error">Project name is required</span>
+              }
+            </div>
+
+            <div class="field">
+              <label for="proj-client" class="label">Client Name <span class="required" aria-hidden="true">*</span></label>
+              <input id="proj-client" class="input" formControlName="clientName" placeholder="e.g. Lumina Studios" />
+              @if (newProjectForm.get('clientName')?.invalid && newProjectForm.get('clientName')?.touched) {
+                <span class="field-error">Client name is required</span>
+              }
+            </div>
+
+            <div class="field">
+              <label for="proj-desc" class="label">Description</label>
+              <textarea id="proj-desc" class="input input--textarea" formControlName="description" rows="3" placeholder="Brief project overview…"></textarea>
+            </div>
+
+            <div class="field-row">
+              <div class="field">
+                <label for="proj-start" class="label">Start Date</label>
+                <input id="proj-start" class="input" formControlName="startDate" type="date" />
+              </div>
+              <div class="field">
+                <label for="proj-target" class="label">Target Date</label>
+                <input id="proj-target" class="input" formControlName="targetDate" type="date" />
+              </div>
+            </div>
+
+            @if (createError()) {
+              <div class="field-error" role="alert">{{ createError() }}</div>
+            }
+
+            <div class="modal-actions">
+              <button type="button" class="btn-cancel" (click)="closeModal()">Cancel</button>
+              <button type="submit" class="btn-submit" [disabled]="creating()">
+                @if (creating()) { Creating… } @else { Create Project }
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    }
   `,
   styles: [`
     .projects-page { max-width: 1200px; }
@@ -146,11 +198,7 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
       color: var(--color-text);
       margin: 0 0 4px;
     }
-    .subheading {
-      font-size: 13px;
-      color: var(--color-text-secondary);
-      margin: 0;
-    }
+    .subheading { font-size: 13px; color: var(--color-text-secondary); margin: 0; }
     .btn-new {
       display: flex;
       align-items: center;
@@ -169,13 +217,21 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
     }
     .btn-new:hover { background: var(--color-primary-hover); }
 
-    /* Filter tabs */
+    .error-banner {
+      padding: 10px 16px;
+      margin-bottom: 16px;
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      color: #EF4444;
+    }
+
     .filter-tabs {
       display: flex;
       gap: 4px;
       margin-bottom: 24px;
       border-bottom: 1px solid var(--color-border);
-      padding-bottom: 0;
     }
     .tab {
       display: flex;
@@ -194,10 +250,7 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
       transition: color 0.15s, border-color 0.15s;
     }
     .tab:hover { color: var(--color-text); }
-    .tab.active {
-      color: var(--color-text);
-      border-bottom-color: var(--color-accent);
-    }
+    .tab.active { color: var(--color-text); border-bottom-color: var(--color-accent); }
     .tab-count {
       background: var(--color-surface-raised);
       color: var(--color-text-secondary);
@@ -206,19 +259,32 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
       padding: 1px 6px;
       border-radius: 10px;
     }
-    .tab.active .tab-count {
-      background: var(--color-accent-light);
-      color: var(--color-accent);
-    }
+    .tab.active .tab-count { background: var(--color-accent-light); color: var(--color-accent); }
 
-    /* Grid */
+    .loading-state {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 80px;
+      color: var(--color-text-secondary);
+      font-size: 14px;
+    }
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--color-border);
+      border-top-color: var(--color-accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
     .project-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
       gap: 16px;
     }
-
-    /* Card */
     .project-card {
       background: var(--color-surface);
       border: 1px solid var(--color-border);
@@ -232,21 +298,9 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
       flex-direction: column;
       gap: 14px;
     }
-    .project-card:hover {
-      box-shadow: var(--shadow-raised);
-      border-color: var(--color-border-strong);
-      transform: translateY(-1px);
-    }
-    .project-card:focus-visible {
-      outline: 2px solid var(--color-accent);
-      outline-offset: 2px;
-    }
-
-    .card-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
+    .project-card:hover { box-shadow: var(--shadow-raised); border-color: var(--color-border-strong); transform: translateY(-1px); }
+    .project-card:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+    .card-top { display: flex; align-items: center; justify-content: space-between; }
     .client-badge {
       width: 38px;
       height: 38px;
@@ -259,66 +313,13 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
       align-items: center;
       justify-content: center;
     }
-
     .card-body { display: flex; flex-direction: column; gap: 2px; }
-    .project-name {
-      font-family: var(--font-display);
-      font-size: 16px;
-      font-weight: 400;
-      color: var(--color-text);
-      margin: 0;
-    }
-    .project-client {
-      font-size: 12.5px;
-      color: var(--color-text-secondary);
-      margin: 0;
-    }
-
-    .card-stage {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-    }
-    .stage-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .stage-label {
-      font-size: 12.5px;
-      color: var(--color-text-secondary);
-    }
-
-    .progress-row {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 6px;
-    }
-    .progress-label, .progress-value {
-      font-size: 11.5px;
-      color: var(--color-text-secondary);
-    }
-    .progress-value { font-weight: 600; }
-    .progress-bar {
-      height: 5px;
-      background: var(--color-surface-raised);
-      border-radius: 10px;
-      overflow: hidden;
-    }
-    .progress-fill {
-      height: 100%;
-      border-radius: 10px;
-      transition: width 0.3s ease;
-    }
-
-    .card-footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding-top: 4px;
-      border-top: 1px solid var(--color-border);
-    }
+    .project-name { font-family: var(--font-display); font-size: 16px; font-weight: 400; color: var(--color-text); margin: 0; }
+    .project-client { font-size: 12.5px; color: var(--color-text-secondary); margin: 0; }
+    .card-stage { display: flex; align-items: center; gap: 7px; }
+    .stage-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .stage-label { font-size: 12.5px; color: var(--color-text-secondary); }
+    .card-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 4px; border-top: 1px solid var(--color-border); }
     .team-avatars { display: flex; }
     .team-avatar {
       width: 26px;
@@ -337,8 +338,6 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
     .team-avatar:first-child { margin-left: 0; }
     .team-avatar.overflow { background: var(--color-border); }
     .updated-at { font-size: 11.5px; color: var(--color-text-muted); }
-
-    /* Empty state */
     .empty-state {
       grid-column: 1 / -1;
       display: flex;
@@ -351,25 +350,129 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
       font-size: 14px;
     }
     .empty-state p { margin: 0; }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 16px;
+    }
+    .modal {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 480px;
+      box-shadow: var(--shadow-raised);
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px 0;
+    }
+    .modal-title {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 400;
+      color: var(--color-text);
+      margin: 0;
+    }
+    .modal-close {
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      background: transparent;
+      color: var(--color-text-muted);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+    }
+    .modal-close:hover { background: var(--color-surface-raised); color: var(--color-text); }
+    .modal-form { padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 16px; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .label { font-size: 13px; font-weight: 500; color: var(--color-text); }
+    .required { color: #EF4444; }
+    .input {
+      height: 38px;
+      padding: 0 12px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      color: var(--color-text);
+      outline: none;
+      transition: border-color 0.15s;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .input:focus { border-color: var(--color-accent); }
+    .input--textarea { height: auto; padding: 10px 12px; resize: vertical; }
+    .field-error { font-size: 12px; color: #EF4444; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; padding-top: 4px; }
+    .btn-cancel {
+      height: 38px;
+      padding: 0 16px;
+      background: transparent;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+    }
+    .btn-cancel:hover { background: var(--color-surface-raised); }
+    .btn-submit {
+      height: 38px;
+      padding: 0 20px;
+      background: var(--color-sidebar);
+      color: #F8FAFC;
+      border: none;
+      border-radius: var(--radius-md);
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    .btn-submit:hover { background: var(--color-primary-hover); }
+    .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
   `]
 })
-export class Projects {
-  protected activeTab = signal<'all' | ProjectStatus>('all');
+export class Projects implements OnInit {
+  private projectService = inject(ProjectService);
+  private fb = inject(FormBuilder);
 
-  protected projects = signal<Project[]>([
-    { id: '1', name: 'Brand Refresh & Website', client: 'Lumina Studios', stage: 'design', status: 'active', progress: 62, updatedAt: 'Today', team: ['AK', 'JD', 'SM', 'LT'] },
-    { id: '2', name: 'E-Commerce Platform', client: 'Verdant Market', stage: 'development', status: 'active', progress: 45, updatedAt: 'Yesterday', team: ['AK', 'JD'] },
-    { id: '3', name: 'SEO & Content Strategy', client: 'Peak Advisory', stage: 'marketing', status: 'active', progress: 80, updatedAt: '2 days ago', team: ['SM', 'LT', 'AK'] },
-    { id: '4', name: 'Corporate Website', client: 'Nexus Holdings', stage: 'content', status: 'active', progress: 30, updatedAt: '3 days ago', team: ['JD', 'AK'] },
-    { id: '5', name: 'Social Media Launch', client: 'Bloom Skincare', stage: 'profiling', status: 'active', progress: 10, updatedAt: '1 week ago', team: ['SM'] },
-    { id: '6', name: 'Annual Report Site', client: 'Atlas Finance', stage: 'development', status: 'on-hold', progress: 55, updatedAt: '2 weeks ago', team: ['JD', 'LT'] },
-  ]);
+  protected activeTab = signal<'all' | ProjectStatus>('all');
+  protected projects = signal<Project[]>([]);
+  protected loading = signal(true);
+  protected error = signal<string | null>(null);
+  protected showModal = signal(false);
+  protected creating = signal(false);
+  protected createError = signal<string | null>(null);
+
+  protected newProjectForm = this.fb.group({
+    name:        ['', Validators.required],
+    clientName:  ['', Validators.required],
+    description: [''],
+    startDate:   [''],
+    targetDate:  [''],
+  });
 
   protected tabs = [
-    { label: 'All', value: 'all' as const, count: computed(() => this.projects().length) },
-    { label: 'Active', value: 'active' as const, count: computed(() => this.projects().filter(p => p.status === 'active').length) },
-    { label: 'On Hold', value: 'on-hold' as const, count: computed(() => this.projects().filter(p => p.status === 'on-hold').length) },
-    { label: 'Completed', value: 'completed' as const, count: computed(() => this.projects().filter(p => p.status === 'completed').length) },
+    { label: 'All',       value: 'all' as const,       count: computed(() => this.projects().length) },
+    { label: 'Active',    value: 'ACTIVE' as const,    count: computed(() => this.projects().filter(p => p.status === 'ACTIVE').length) },
+    { label: 'On Hold',   value: 'ON_HOLD' as const,   count: computed(() => this.projects().filter(p => p.status === 'ON_HOLD').length) },
+    { label: 'Completed', value: 'COMPLETED' as const, count: computed(() => this.projects().filter(p => p.status === 'COMPLETED').length) },
   ];
 
   protected filtered = computed(() => {
@@ -378,15 +481,83 @@ export class Projects {
     return this.projects().filter(p => p.status === tab);
   });
 
+  ngOnInit() {
+    this.loadProjects();
+  }
+
+  private loadProjects() {
+    this.loading.set(true);
+    this.error.set(null);
+    this.projectService.getProjects().subscribe({
+      next: (projects) => {
+        this.projects.set(projects);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        this.error.set('Could not load projects. Is the backend running?');
+        this.loading.set(false);
+        console.error(err);
+      },
+    });
+  }
+
+  protected createProject() {
+    if (this.newProjectForm.invalid) {
+      this.newProjectForm.markAllAsTouched();
+      return;
+    }
+    this.creating.set(true);
+    this.createError.set(null);
+    const v = this.newProjectForm.value;
+    this.projectService.createProject({
+      name:        v.name!,
+      clientName:  v.clientName!,
+      description: v.description || undefined,
+      startDate:   v.startDate || undefined,
+      targetDate:  v.targetDate || undefined,
+    }).subscribe({
+      next: (project) => {
+        this.projects.update(list => [project, ...list]);
+        this.closeModal();
+        this.creating.set(false);
+      },
+      error: (err) => {
+        this.createError.set(err?.error?.message || 'Failed to create project.');
+        this.creating.set(false);
+      },
+    });
+  }
+
+  protected closeModal() {
+    this.showModal.set(false);
+    this.newProjectForm.reset();
+    this.createError.set(null);
+  }
+
   protected stageLabel(stage: PipelineStage) { return STAGE_LABELS[stage]; }
   protected stageColor(stage: PipelineStage) { return STAGE_COLORS[stage]; }
+
+  protected statusLabel(status: ProjectStatus) {
+    if (status === 'ACTIVE') return 'Active';
+    if (status === 'ON_HOLD') return 'On Hold';
+    return 'Completed';
+  }
+
   protected statusVariant(status: ProjectStatus): 'success' | 'warning' | 'info' {
-    if (status === 'active') return 'success';
-    if (status === 'on-hold') return 'warning';
+    if (status === 'ACTIVE') return 'success';
+    if (status === 'ON_HOLD') return 'warning';
     return 'info';
   }
 
-  protected newProject() {
-    // TODO: open new project modal
+  protected relativeTime(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return mins <= 1 ? 'Just now' : `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    if (days === 1) return 'Yesterday';
+    if (days < 7) return `${days} days ago`;
+    return new Date(iso).toLocaleDateString();
   }
 }

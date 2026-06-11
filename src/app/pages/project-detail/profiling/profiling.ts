@@ -1,7 +1,9 @@
-import { Component, signal, computed } from '@angular/core';
+import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
-import { inject } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { Badge } from '../../../ui';
+import { ProjectService } from '../../../services/project.service';
+import { ProjectStateService } from '../../../services/project-state.service';
 
 type TabId = 'brief' | 'brand' | 'personas' | 'competitors' | 'seo' | 'timeline';
 
@@ -651,8 +653,20 @@ interface Milestone {
     .empty-hint { font-size: 13px; color: var(--color-text-muted); padding: 12px 0; }
   `]
 })
-export class Profiling {
+export class Profiling implements OnInit {
   private fb = inject(FormBuilder);
+  private route = inject(ActivatedRoute);
+  private projectService = inject(ProjectService);
+  private state = inject(ProjectStateService);
+
+  private get projectId(): string {
+    return this.route.parent?.snapshot.paramMap.get('id') ?? '';
+  }
+
+  protected saving = signal(false);
+  protected saveSuccess = signal(false);
+  protected gateLoading = signal(false);
+  protected gateError = signal<string | null>(null);
 
   protected activeTab = signal<TabId>('brief');
 
@@ -692,19 +706,9 @@ export class Profiling {
     seoNotes:          [''],
   });
 
-  protected personas = signal<Persona[]>([
-    { id: '1', name: 'Marketing Manager', age: '30–45', role: 'B2B decision maker', pain: 'Limited time, needs ROI-focused content', goal: 'Drive qualified leads via digital channels' },
-  ]);
-
-  protected competitors = signal<Competitor[]>([
-    { id: '1', name: '', url: '', strength: '', weakness: '' },
-  ]);
-
-  protected milestones = signal<Milestone[]>([
-    { id: '1', label: 'Client brief sign-off', date: '', done: false },
-    { id: '2', label: 'Brand inputs submitted', date: '', done: false },
-    { id: '3', label: 'Profiling complete — Hard Gate', date: '', done: false },
-  ]);
+  protected personas = signal<Persona[]>([]);
+  protected competitors = signal<Competitor[]>([]);
+  protected milestones = signal<Milestone[]>([]);
 
   protected profilingComplete = computed(() =>
     this.briefForm.valid && this.brandForm.valid && this.seoForm.valid
@@ -723,13 +727,59 @@ export class Profiling {
     return total === 0 ? 0 : Math.round((this.doneCount() / total) * 100);
   });
 
+  ngOnInit() {
+    const profiling = this.state.project()?.profiling;
+    if (profiling) {
+      this.briefForm.patchValue({
+        companyName: profiling.companyName ?? '',
+        industry:    profiling.industry ?? '',
+        about:       profiling.about ?? '',
+        objectives:  profiling.objectives ?? '',
+      });
+      this.brandForm.patchValue({ brandVoice: profiling.brandVoice ?? '' });
+      this.seoForm.patchValue({
+        primaryKeywords:   profiling.primaryKeywords ?? '',
+        secondaryKeywords: profiling.secondaryKeywords ?? '',
+      });
+      this.personas.set((profiling.personas ?? []).map(p => ({
+        id: p.id, name: p.name ?? '', age: p.age ?? '', role: p.role ?? '',
+        pain: p.painPoints ?? '', goal: p.goals ?? '',
+      })));
+      this.competitors.set((profiling.competitors ?? []).map(c => ({
+        id: c.id, name: c.name ?? '', url: c.url ?? '',
+        strength: c.strengths ?? '', weakness: c.weaknesses ?? '',
+      })));
+    }
+    const milestones = this.state.project()?.milestones ?? [];
+    this.milestones.set(milestones.map(m => ({
+      id: m.id, label: m.label, date: m.dueDate?.slice(0, 10) ?? '',
+      done: m.status === 'DONE',
+    })));
+  }
+
+  private upsertAll() {
+    const b = this.briefForm.value;
+    const br = this.brandForm.value;
+    const s = this.seoForm.value;
+    return this.projectService.upsertProfiling(this.projectId, {
+      companyName:       b.companyName ?? undefined,
+      industry:          b.industry ?? undefined,
+      about:             b.about ?? undefined,
+      objectives:        b.objectives ?? undefined,
+      brandVoice:        br.brandVoice ?? undefined,
+      primaryKeywords:   s.primaryKeywords ?? undefined,
+      secondaryKeywords: s.secondaryKeywords ?? undefined,
+    });
+  }
+
   protected addPersona() {
-    const id = Date.now().toString();
-    this.personas.update(list => [...list, { id, name: 'New Persona', age: '', role: '', pain: '', goal: '' }]);
+    this.projectService.createPersona(this.projectId, { name: 'New Persona', age: '', role: '', painPoints: '', goals: '' })
+      .subscribe(p => this.personas.update(list => [...list, { id: p.id, name: p.name ?? '', age: p.age ?? '', role: p.role ?? '', pain: p.painPoints ?? '', goal: p.goals ?? '' }]));
   }
 
   protected removePersona(id: string) {
-    this.personas.update(list => list.filter(p => p.id !== id));
+    this.projectService.deletePersona(this.projectId, id)
+      .subscribe(() => this.personas.update(list => list.filter(p => p.id !== id)));
   }
 
   protected updatePersona(id: string, field: keyof Persona, value: string) {
@@ -737,12 +787,13 @@ export class Profiling {
   }
 
   protected addCompetitor() {
-    const id = Date.now().toString();
-    this.competitors.update(list => [...list, { id, name: '', url: '', strength: '', weakness: '' }]);
+    this.projectService.createCompetitor(this.projectId, { name: '', url: '', strengths: '', weaknesses: '' })
+      .subscribe(c => this.competitors.update(list => [...list, { id: c.id, name: c.name ?? '', url: c.url ?? '', strength: c.strengths ?? '', weakness: c.weaknesses ?? '' }]));
   }
 
   protected removeComp(id: string) {
-    this.competitors.update(list => list.filter(c => c.id !== id));
+    this.projectService.deleteCompetitor(this.projectId, id)
+      .subscribe(() => this.competitors.update(list => list.filter(c => c.id !== id)));
   }
 
   protected updateComp(id: string, field: keyof Competitor, value: string) {
@@ -750,12 +801,13 @@ export class Profiling {
   }
 
   protected addMilestone() {
-    const id = Date.now().toString();
-    this.milestones.update(list => [...list, { id, label: '', date: '', done: false }]);
+    this.projectService.createMilestone(this.projectId, { label: '', status: 'PENDING', sortOrder: this.milestones().length + 1 })
+      .subscribe(m => this.milestones.update(list => [...list, { id: m.id, label: m.label, date: m.dueDate?.slice(0, 10) ?? '', done: false }]));
   }
 
   protected removeMilestone(id: string) {
-    this.milestones.update(list => list.filter(m => m.id !== id));
+    this.projectService.deleteMilestone(this.projectId, id)
+      .subscribe(() => this.milestones.update(list => list.filter(m => m.id !== id)));
   }
 
   protected updateMilestone(id: string, field: keyof Milestone, value: string | boolean) {
@@ -763,10 +815,42 @@ export class Profiling {
   }
 
   protected toggleMilestone(id: string) {
-    this.milestones.update(list => list.map(m => m.id === id ? { ...m, done: !m.done } : m));
+    const ms = this.milestones().find(m => m.id === id);
+    if (!ms) return;
+    const newStatus = ms.done ? 'PENDING' : 'DONE';
+    this.projectService.updateMilestone(this.projectId, id, { status: newStatus })
+      .subscribe(() => this.milestones.update(list => list.map(m => m.id === id ? { ...m, done: !m.done } : m)));
   }
 
-  protected saveBrief()  { this.briefForm.markAllAsTouched(); }
-  protected saveBrand()  { this.brandForm.markAllAsTouched(); }
-  protected saveSeo()    { this.seoForm.markAllAsTouched(); }
+  private doSave() {
+    this.saving.set(true);
+    this.upsertAll().subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.saveSuccess.set(true);
+        setTimeout(() => this.saveSuccess.set(false), 2000);
+      },
+      error: () => this.saving.set(false),
+    });
+  }
+
+  protected saveBrief()  { this.briefForm.markAllAsTouched(); if (this.briefForm.valid) this.doSave(); }
+  protected saveBrand()  { this.brandForm.markAllAsTouched(); if (this.brandForm.valid) this.doSave(); }
+  protected saveSeo()    { this.seoForm.markAllAsTouched();   if (this.seoForm.valid)   this.doSave(); }
+
+  protected completeGate() {
+    this.gateLoading.set(true);
+    this.gateError.set(null);
+    this.projectService.completeProfiling(this.projectId).subscribe({
+      next: () => {
+        this.gateLoading.set(false);
+        this.projectService.getProject(this.projectId)
+          .subscribe(p => this.state.setProject(p));
+      },
+      error: (err) => {
+        this.gateError.set(err?.error?.error ?? 'Gate approval failed.');
+        this.gateLoading.set(false);
+      },
+    });
+  }
 }

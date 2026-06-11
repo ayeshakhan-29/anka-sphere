@@ -1,9 +1,12 @@
-import { Component, signal, computed, inject } from '@angular/core';
+import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { Badge } from '../../../ui';
+import { ProjectService } from '../../../services/project.service';
+import { ProjectStateService } from '../../../services/project-state.service';
 
 type TabId = 'brief' | 'pages' | 'review';
-type PageStatus = 'DRAFT' | 'IN_REVIEW' | 'APPROVED' | 'PUBLISHED';
+type PageStatus = 'DRAFT' | 'IN_REVIEW' | 'APPROVED' | 'REVISION';
 
 interface ContentPage {
   id: string;
@@ -16,7 +19,7 @@ interface ContentPage {
   seoDescription: string;
 }
 
-const STATUS_ORDER: PageStatus[] = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'PUBLISHED'];
+const STATUS_ORDER: PageStatus[] = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'REVISION'];
 
 @Component({
   selector: 'app-written-content',
@@ -672,8 +675,15 @@ const STATUS_ORDER: PageStatus[] = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'PUBLISHED
     .empty-hint { font-size: 13px; color: var(--color-text-muted); padding: 16px 0; }
   `]
 })
-export class WrittenContent {
+export class WrittenContent implements OnInit {
   private fb = inject(FormBuilder);
+  private route = inject(ActivatedRoute);
+  private projectService = inject(ProjectService);
+  private state = inject(ProjectStateService);
+
+  private get projectId(): string {
+    return this.route.parent?.snapshot.paramMap.get('id') ?? '';
+  }
 
   protected activeTab = signal<TabId>('brief');
 
@@ -689,10 +699,7 @@ export class WrittenContent {
     seoGuidelines: [''],
   });
 
-  protected pages = signal<ContentPage[]>([
-    { id: '1', title: 'Home', slug: 'home', body: '', status: 'DRAFT', wordCount: 0, seoTitle: '', seoDescription: '' },
-    { id: '2', title: 'About Us', slug: 'about-us', body: '', status: 'IN_REVIEW', wordCount: 312, seoTitle: 'About Us | Lumina Studios', seoDescription: '' },
-  ]);
+  protected pages = signal<ContentPage[]>([]);
 
   protected selectedPage = signal<ContentPage | null>(null);
 
@@ -700,11 +707,11 @@ export class WrittenContent {
     { value: 'DRAFT',      label: 'Draft' },
     { value: 'IN_REVIEW',  label: 'In Review' },
     { value: 'APPROVED',   label: 'Approved' },
-    { value: 'PUBLISHED',  label: 'Published' },
+    { value: 'REVISION',   label: 'Revision' },
   ];
 
   protected totalWordCount = computed(() => this.pages().reduce((sum, p) => sum + p.wordCount, 0));
-  protected approvedCount = computed(() => this.pages().filter(p => p.status === 'APPROVED' || p.status === 'PUBLISHED').length);
+  protected approvedCount = computed(() => this.pages().filter(p => p.status === 'APPROVED').length);
   protected stageComplete = computed(() => this.briefForm.valid && this.approvedCount() > 0);
   protected gateReady = computed(() => this.briefForm.valid && this.pages().length > 0 && this.approvedCount() > 0);
   protected gateSubmitting = signal(false);
@@ -715,11 +722,11 @@ export class WrittenContent {
     return STATUS_ORDER.indexOf(status);
   }
 
-  protected statusVariant(status: PageStatus): 'default' | 'warning' | 'success' | 'info' {
+  protected statusVariant(status: PageStatus): 'default' | 'warning' | 'success' | 'destructive' {
     if (status === 'DRAFT')     return 'default';
     if (status === 'IN_REVIEW') return 'warning';
     if (status === 'APPROVED')  return 'success';
-    return 'info';
+    return 'destructive';
   }
 
   protected statusLabel(status: PageStatus): string {
@@ -727,28 +734,53 @@ export class WrittenContent {
     return status.charAt(0) + status.slice(1).toLowerCase();
   }
 
+  ngOnInit() {
+    const content = this.state.project()?.content;
+    if (content) {
+      this.briefForm.patchValue({
+        contentBrief: content.contentBrief ?? '',
+        toneOfVoice:  content.toneOfVoice ?? '',
+      });
+      this.pages.set((content.pages ?? []).map(p => ({
+        id: p.id,
+        title: p.title,
+        slug: p.slug ?? '',
+        body: p.body ?? '',
+        status: p.status as PageStatus,
+        wordCount: p.wordCount ?? 0,
+        seoTitle: p.metaTitle ?? '',
+        seoDescription: p.metaDescription ?? '',
+      })));
+    }
+  }
+
   protected addPage() {
-    const id = Date.now().toString();
-    const page: ContentPage = { id, title: '', slug: '', body: '', status: 'DRAFT', wordCount: 0, seoTitle: '', seoDescription: '' };
-    this.pages.update(list => [...list, page]);
-    this.selectedPage.set(page);
+    this.projectService.createPage(this.projectId, { title: '', status: 'DRAFT', sortOrder: this.pages().length + 1 })
+      .subscribe(p => {
+        const page: ContentPage = { id: p.id, title: p.title, slug: p.slug ?? '', body: p.body ?? '', status: p.status as PageStatus, wordCount: p.wordCount ?? 0, seoTitle: p.metaTitle ?? '', seoDescription: p.metaDescription ?? '' };
+        this.pages.update(list => [...list, page]);
+        this.selectedPage.set(page);
+      });
   }
 
   protected deletePage(id: string) {
-    if (this.selectedPage()?.id === id) this.selectedPage.set(null);
-    this.pages.update(list => list.filter(p => p.id !== id));
+    this.projectService.deletePage(this.projectId, id).subscribe(() => {
+      if (this.selectedPage()?.id === id) this.selectedPage.set(null);
+      this.pages.update(list => list.filter(p => p.id !== id));
+    });
   }
 
   protected updatePage(id: string, field: keyof ContentPage, value: string) {
+    const wordCount = field === 'body' ? (value.trim() ? value.trim().split(/\s+/).length : 0) : undefined;
     this.pages.update(list => list.map(p => {
       if (p.id !== id) return p;
-      const updated = { ...p, [field]: value };
-      if (field === 'body') updated.wordCount = value.trim() ? value.trim().split(/\s+/).length : 0;
-      return updated;
+      return { ...p, [field]: value, ...(wordCount !== undefined ? { wordCount } : {}) };
     }));
     if (this.selectedPage()?.id === id) {
-      this.selectedPage.update(p => p ? { ...p, [field]: value, wordCount: field === 'body' ? (value.trim() ? value.trim().split(/\s+/).length : 0) : p.wordCount } : null);
+      this.selectedPage.update(p => p ? { ...p, [field]: value, ...(wordCount !== undefined ? { wordCount } : {}) } : null);
     }
+    const apiField = field === 'seoTitle' ? 'metaTitle' : field === 'seoDescription' ? 'metaDescription' : field;
+    this.projectService.updatePage(this.projectId, id, { [apiField]: value, ...(wordCount !== undefined ? { wordCount } : {}) }).subscribe();
   }
 
   protected onBodyInput(id: string, value: string) {
@@ -756,22 +788,33 @@ export class WrittenContent {
   }
 
   protected setPageStatus(id: string, status: PageStatus) {
-    this.pages.update(list => list.map(p => p.id === id ? { ...p, status } : p));
-    this.selectedPage.update(p => p?.id === id ? { ...p, status } : p);
+    this.projectService.updatePageStatus(this.projectId, id, status).subscribe(() => {
+      this.pages.update(list => list.map(p => p.id === id ? { ...p, status } : p));
+      this.selectedPage.update(p => p?.id === id ? { ...p, status } : p);
+    });
   }
 
   protected saveBrief() {
     this.briefForm.markAllAsTouched();
+    if (this.briefForm.invalid) return;
+    const v = this.briefForm.value;
+    this.projectService.upsertContent(this.projectId, { contentBrief: v.contentBrief ?? undefined, toneOfVoice: v.toneOfVoice ?? undefined }).subscribe();
   }
 
   protected approveGate() {
     if (!this.gateReady()) return;
     this.gateSubmitting.set(true);
     this.gateError.set(null);
-    // TODO: call POST /projects/:id/content/complete
-    setTimeout(() => {
-      this.gateSubmitting.set(false);
-      this.gateSuccess.set(true);
-    }, 1000);
+    this.projectService.completeContent(this.projectId).subscribe({
+      next: () => {
+        this.gateSubmitting.set(false);
+        this.gateSuccess.set(true);
+        this.projectService.getProject(this.projectId).subscribe(p => this.state.setProject(p));
+      },
+      error: (err) => {
+        this.gateError.set(err?.error?.error ?? 'Gate approval failed.');
+        this.gateSubmitting.set(false);
+      },
+    });
   }
 }

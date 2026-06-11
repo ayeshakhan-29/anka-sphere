@@ -1,6 +1,9 @@
-import { Component, signal, computed, inject } from '@angular/core';
+import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { Badge } from '../../../ui';
+import { ProjectService } from '../../../services/project.service';
+import { ProjectStateService } from '../../../services/project-state.service';
 
 type TabId = 'brief' | 'kanban' | 'assets' | 'gate';
 type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE';
@@ -575,8 +578,15 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
     .empty-hint { font-size: 13px; color: var(--color-text-muted); padding: 16px 0; }
   `]
 })
-export class DesignModule {
+export class DesignModule implements OnInit {
   private fb = inject(FormBuilder);
+  private route = inject(ActivatedRoute);
+  private projectService = inject(ProjectService);
+  private state = inject(ProjectStateService);
+
+  private get projectId(): string {
+    return this.route.parent?.snapshot.paramMap.get('id') ?? '';
+  }
 
   protected activeTab = signal<TabId>('brief');
 
@@ -595,19 +605,8 @@ export class DesignModule {
     figmaUrl:   [''],
   });
 
-  protected tasks = signal<DesignTask[]>([
-    { id: '1', title: 'Wireframes — Home & About', description: 'Low-fi wireframes for review', status: 'DONE',        priority: 'HIGH',   assigneeName: 'Sara M.', dueDate: '' },
-    { id: '2', title: 'Brand style tile',          description: '',                              status: 'DONE',        priority: 'HIGH',   assigneeName: 'Sara M.', dueDate: '' },
-    { id: '3', title: 'High-fidelity mockups',     description: 'Full colour mockups all pages', status: 'IN_PROGRESS', priority: 'HIGH',   assigneeName: 'Sara M.', dueDate: '' },
-    { id: '4', title: 'Mobile responsive designs', description: '',                              status: 'TODO',        priority: 'MEDIUM', assigneeName: '',         dueDate: '' },
-    { id: '5', title: 'Prototype & interactions',  description: '',                              status: 'TODO',        priority: 'LOW',    assigneeName: '',         dueDate: '' },
-  ]);
-
-  protected assets = signal<DesignAsset[]>([
-    { id: '1', name: 'Brand Logo Suite',     type: 'IMAGE',    url: '#', thumbnailUrl: '', version: 2, notes: 'SVG + PNG variants', approvedAt: '2026-05-01' },
-    { id: '2', name: 'Colour Palette',       type: 'DOCUMENT', url: '#', thumbnailUrl: '', version: 1, notes: '',                  approvedAt: null },
-    { id: '3', name: 'Inter Font Files',     type: 'FONT',     url: '#', thumbnailUrl: '', version: 1, notes: 'Variable font',     approvedAt: '2026-05-02' },
-  ]);
+  protected tasks = signal<DesignTask[]>([]);
+  protected assets = signal<DesignAsset[]>([]);
 
   protected editingDesc = signal<string | null>(null);
   protected assetFilter = signal<string>('ALL');
@@ -648,26 +647,51 @@ export class DesignModule {
   protected stageComplete = computed(() => this.briefForm.valid && this.gateSuccess());
   protected gateReady = computed(() => this.briefForm.valid);
 
+  ngOnInit() {
+    const design = this.state.project()?.design;
+    if (design) {
+      this.briefForm.patchValue({
+        brief:      design.brief ?? '',
+        styleGuide: design.styleGuide ?? '',
+        figmaUrl:   design.figmaUrl ?? '',
+      });
+      this.tasks.set((design.tasks ?? []).map(t => ({
+        id: t.id, title: t.title, description: t.description ?? '',
+        status: t.status as TaskStatus, priority: t.priority as TaskPriority,
+        assigneeName: '', dueDate: t.dueDate?.slice(0, 10) ?? '',
+      })));
+      this.assets.set((design.assets ?? []).map(a => ({
+        id: a.id, name: a.name, type: a.type as AssetType,
+        url: a.url, thumbnailUrl: '', version: a.version,
+        notes: a.notes ?? '', approvedAt: a.approvedAt ?? null,
+      })));
+    }
+  }
+
   protected addTask() {
-    const id = Date.now().toString();
-    this.tasks.update(list => [...list, { id, title: '', description: '', status: 'TODO', priority: 'MEDIUM', assigneeName: '', dueDate: '' }]);
+    this.projectService.createDesignTask(this.projectId, { title: '', status: 'TODO', priority: 'MEDIUM', sortOrder: this.tasks().length + 1 })
+      .subscribe(t => this.tasks.update(list => [...list, { id: t.id, title: t.title, description: t.description ?? '', status: t.status as TaskStatus, priority: t.priority as TaskPriority, assigneeName: '', dueDate: '' }]));
   }
 
   protected deleteTask(id: string) {
-    this.tasks.update(list => list.filter(t => t.id !== id));
+    this.projectService.deleteDesignTask(this.projectId, id)
+      .subscribe(() => this.tasks.update(list => list.filter(t => t.id !== id)));
   }
 
   protected updateTask(id: string, field: keyof DesignTask, value: string) {
     this.tasks.update(list => list.map(t => t.id === id ? { ...t, [field]: value } : t));
+    const apiField = field === 'assigneeName' ? 'assigneeId' : field;
+    this.projectService.updateDesignTask(this.projectId, id, { [apiField]: value }).subscribe();
   }
 
   protected cycleStatus(id: string) {
     const order: TaskStatus[] = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
-    this.tasks.update(list => list.map(t => {
-      if (t.id !== id) return t;
-      const next = order[(order.indexOf(t.status) + 1) % order.length];
-      return { ...t, status: next };
-    }));
+    const task = this.tasks().find(t => t.id === id);
+    if (!task) return;
+    const next = order[(order.indexOf(task.status) + 1) % order.length];
+    this.projectService.updateDesignTask(this.projectId, id, { status: next }).subscribe(() =>
+      this.tasks.update(list => list.map(t => t.id === id ? { ...t, status: next } : t))
+    );
   }
 
   protected assetIcon(type: AssetType): string {
@@ -676,21 +700,25 @@ export class DesignModule {
   }
 
   protected approveAsset(id: string) {
-    this.assets.update(list => list.map(a => a.id === id ? { ...a, approvedAt: new Date().toISOString() } : a));
+    this.projectService.approveDesignAsset(this.projectId, id)
+      .subscribe(a => this.assets.update(list => list.map(x => x.id === id ? { ...x, approvedAt: a.approvedAt ?? new Date().toISOString() } : x)));
   }
 
   protected deleteAsset(id: string) {
-    this.assets.update(list => list.filter(a => a.id !== id));
+    this.projectService.deleteDesignAsset(this.projectId, id)
+      .subscribe(() => this.assets.update(list => list.filter(a => a.id !== id)));
   }
 
   protected saveAsset() {
     this.assetForm.markAllAsTouched();
     if (this.assetForm.invalid) return;
     const v = this.assetForm.getRawValue();
-    const id = Date.now().toString();
-    this.assets.update(list => [...list, { id, name: v.name ?? '', type: (v.type ?? 'OTHER') as AssetType, url: v.url ?? '', thumbnailUrl: '', version: 1, notes: v.notes ?? '', approvedAt: null }]);
-    this.assetForm.reset({ type: 'IMAGE' });
-    this.addingAsset.set(false);
+    this.projectService.createDesignAsset(this.projectId, { name: v.name ?? '', type: (v.type ?? 'OTHER') as AssetType, url: v.url ?? '', notes: v.notes ?? undefined, version: 1 })
+      .subscribe(a => {
+        this.assets.update(list => [...list, { id: a.id, name: a.name, type: a.type as AssetType, url: a.url, thumbnailUrl: '', version: a.version, notes: a.notes ?? '', approvedAt: a.approvedAt ?? null }]);
+        this.assetForm.reset({ type: 'IMAGE' });
+        this.addingAsset.set(false);
+      });
   }
 
   protected cancelAsset() {
@@ -700,16 +728,25 @@ export class DesignModule {
 
   protected saveBrief() {
     this.briefForm.markAllAsTouched();
+    if (this.briefForm.invalid) return;
+    const v = this.briefForm.value;
+    this.projectService.upsertDesign(this.projectId, { brief: v.brief ?? undefined, styleGuide: v.styleGuide ?? undefined, figmaUrl: v.figmaUrl ?? undefined }).subscribe();
   }
 
   protected approveGate() {
     if (!this.gateReady()) return;
     this.gateSubmitting.set(true);
     this.gateError.set(null);
-    // TODO: call POST /projects/:id/design/complete
-    setTimeout(() => {
-      this.gateSubmitting.set(false);
-      this.gateSuccess.set(true);
-    }, 1000);
+    this.projectService.completeDesign(this.projectId).subscribe({
+      next: () => {
+        this.gateSubmitting.set(false);
+        this.gateSuccess.set(true);
+        this.projectService.getProject(this.projectId).subscribe(p => this.state.setProject(p));
+      },
+      error: (err) => {
+        this.gateError.set(err?.error?.error ?? 'Gate approval failed.');
+        this.gateSubmitting.set(false);
+      },
+    });
   }
 }

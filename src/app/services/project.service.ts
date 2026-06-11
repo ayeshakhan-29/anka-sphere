@@ -1,0 +1,170 @@
+import { Injectable, inject } from '@angular/core';
+import { ApiService } from './api.service';
+import {
+  Project,
+  ProjectProfiling,
+  WrittenContent,
+  ContentPage,
+  Design,
+  DesignTask,
+  DesignAsset,
+  Milestone,
+  Persona,
+  Competitor,
+  CreateProjectDto,
+} from '../models/project.models';
+
+@Injectable({ providedIn: 'root' })
+export class ProjectService {
+  private api = inject(ApiService);
+
+  // ── Projects ──────────────────────────────────────────────────────────────
+
+  getProjects() {
+    return this.api.get<Project[]>('/projects');
+  }
+
+  getProject(id: string) {
+    return this.api.get<Project>(`/projects/${id}`);
+  }
+
+  createProject(data: CreateProjectDto) {
+    return this.api.post<Project>('/projects', data);
+  }
+
+  updateProject(id: string, data: Partial<CreateProjectDto>) {
+    return this.api.patch<Project>(`/projects/${id}`, data);
+  }
+
+  deleteProject(id: string) {
+    return this.api.delete<void>(`/projects/${id}`);
+  }
+
+  // ── Profiling ─────────────────────────────────────────────────────────────
+
+  upsertProfiling(projectId: string, data: Partial<ProjectProfiling>) {
+    return this.api.put<ProjectProfiling>(`/projects/${projectId}/profiling`, data);
+  }
+
+  completeProfiling(projectId: string) {
+    return this.api.post<{ message: string }>(`/projects/${projectId}/profiling/complete`, {});
+  }
+
+  // ── Personas ──────────────────────────────────────────────────────────────
+
+  createPersona(projectId: string, data: Omit<Persona, 'id'>) {
+    return this.api.post<Persona>(`/projects/${projectId}/profiling/personas`, data);
+  }
+
+  updatePersona(projectId: string, personaId: string, data: Partial<Persona>) {
+    return this.api.patch<Persona>(`/projects/${projectId}/profiling/personas/${personaId}`, data);
+  }
+
+  deletePersona(projectId: string, personaId: string) {
+    return this.api.delete<void>(`/projects/${projectId}/profiling/personas/${personaId}`);
+  }
+
+  // ── Competitors ───────────────────────────────────────────────────────────
+
+  createCompetitor(projectId: string, data: Omit<Competitor, 'id'>) {
+    return this.api.post<Competitor>(`/projects/${projectId}/profiling/competitors`, data);
+  }
+
+  updateCompetitor(projectId: string, compId: string, data: Partial<Competitor>) {
+    return this.api.patch<Competitor>(`/projects/${projectId}/profiling/competitors/${compId}`, data);
+  }
+
+  deleteCompetitor(projectId: string, compId: string) {
+    return this.api.delete<void>(`/projects/${projectId}/profiling/competitors/${compId}`);
+  }
+
+  // ── Milestones ────────────────────────────────────────────────────────────
+
+  getMilestones(projectId: string) {
+    return this.api.get<Milestone[]>(`/projects/${projectId}/milestones`);
+  }
+
+  createMilestone(projectId: string, data: Omit<Milestone, 'id'>) {
+    return this.api.post<Milestone>(`/projects/${projectId}/milestones`, data);
+  }
+
+  updateMilestone(projectId: string, msId: string, data: Partial<Milestone>) {
+    return this.api.patch<Milestone>(`/projects/${projectId}/milestones/${msId}`, data);
+  }
+
+  deleteMilestone(projectId: string, msId: string) {
+    return this.api.delete<void>(`/projects/${projectId}/milestones/${msId}`);
+  }
+
+  // ── Written Content ───────────────────────────────────────────────────────
+
+  getContent(projectId: string) {
+    return this.api.get<WrittenContent>(`/projects/${projectId}/content`);
+  }
+
+  upsertContent(projectId: string, data: Partial<WrittenContent>) {
+    return this.api.put<WrittenContent>(`/projects/${projectId}/content`, data);
+  }
+
+  completeContent(projectId: string) {
+    return this.api.post<{ message: string }>(`/projects/${projectId}/content/complete`, {});
+  }
+
+  createPage(projectId: string, data: Omit<ContentPage, 'id'>) {
+    return this.api.post<ContentPage>(`/projects/${projectId}/content/pages`, data);
+  }
+
+  updatePage(projectId: string, pageId: string, data: Partial<ContentPage>) {
+    return this.api.patch<ContentPage>(`/projects/${projectId}/content/pages/${pageId}`, data);
+  }
+
+  updatePageStatus(projectId: string, pageId: string, status: string) {
+    return this.api.patch<ContentPage>(`/projects/${projectId}/content/pages/${pageId}/status`, { status });
+  }
+
+  deletePage(projectId: string, pageId: string) {
+    return this.api.delete<void>(`/projects/${projectId}/content/pages/${pageId}`);
+  }
+
+  // ── Design ────────────────────────────────────────────────────────────────
+
+  getDesign(projectId: string) {
+    return this.api.get<Design>(`/projects/${projectId}/design`);
+  }
+
+  upsertDesign(projectId: string, data: Partial<Design>) {
+    return this.api.put<Design>(`/projects/${projectId}/design`, data);
+  }
+
+  completeDesign(projectId: string) {
+    return this.api.post<{ message: string; warnings: string[] }>(`/projects/${projectId}/design/complete`, {});
+  }
+
+  createDesignTask(projectId: string, data: Omit<DesignTask, 'id'>) {
+    return this.api.post<DesignTask>(`/projects/${projectId}/design/tasks`, data);
+  }
+
+  updateDesignTask(projectId: string, taskId: string, data: Partial<DesignTask>) {
+    return this.api.patch<DesignTask>(`/projects/${projectId}/design/tasks/${taskId}`, data);
+  }
+
+  deleteDesignTask(projectId: string, taskId: string) {
+    return this.api.delete<void>(`/projects/${projectId}/design/tasks/${taskId}`);
+  }
+
+  createDesignAsset(projectId: string, data: Omit<DesignAsset, 'id'>) {
+    return this.api.post<DesignAsset>(`/projects/${projectId}/design/assets`, data);
+  }
+
+  updateDesignAsset(projectId: string, assetId: string, data: Partial<DesignAsset>) {
+    return this.api.patch<DesignAsset>(`/projects/${projectId}/design/assets/${assetId}`, data);
+  }
+
+  approveDesignAsset(projectId: string, assetId: string) {
+    return this.api.post<DesignAsset>(`/projects/${projectId}/design/assets/${assetId}/approve`, {});
+  }
+
+  deleteDesignAsset(projectId: string, assetId: string) {
+    return this.api.delete<void>(`/projects/${projectId}/design/assets/${assetId}`);
+  }
+}
