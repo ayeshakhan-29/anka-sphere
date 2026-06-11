@@ -1,6 +1,8 @@
-import { Component, signal, computed } from '@angular/core';
+import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Badge } from '../../ui';
+import { ProjectService } from '../../services/project.service';
+import { Project } from '../../models/project.models';
 
 type DesignGateStatus = 'not-started' | 'in-progress' | 'in-review' | 'pending-gate' | 'approved';
 
@@ -715,12 +717,15 @@ const MOCK_PROJECTS: DesignProject[] = [
     }
   `]
 })
-export class DesignDept {
+export class DesignDept implements OnInit {
+  private projectService = inject(ProjectService);
+
   protected search = signal('');
   protected activeFilter = signal<'all' | DesignGateStatus>('all');
   protected sort = signal<'priority' | 'tasks' | 'assets' | 'days'>('priority');
+  protected loading = signal(true);
 
-  protected projects = signal<DesignProject[]>(MOCK_PROJECTS);
+  protected projects = signal<DesignProject[]>([]);
 
   protected activeProjects = computed(() =>
     this.projects().filter(p => p.gateStatus !== 'approved')
@@ -821,6 +826,64 @@ export class DesignDept {
       case 'in-progress':   return 'In Progress';
       case 'not-started':   return 'Not Started';
     }
+  }
+
+  ngOnInit() {
+    this.projectService.getProjects().subscribe({
+      next: (projects) => {
+        this.projects.set(
+          projects
+            .filter(p => p.currentStage === 'DESIGN')
+            .map(p => this.mapProject(p))
+        );
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false),
+    });
+  }
+
+  private mapProject(p: Project): DesignProject {
+    const entry = p.pipeline.find(e => e.stage === 'DESIGN');
+    const daysInStage = entry?.startedAt
+      ? Math.floor((Date.now() - new Date(entry.startedAt).getTime()) / 86400000)
+      : 0;
+    const targetDays = 21;
+    const design = p.design;
+    const allTasks = design?.tasks ?? [];
+    const tasks: TaskBreakdown = {
+      todo:       allTasks.filter(t => t.status === 'TODO').length,
+      inProgress: allTasks.filter(t => t.status === 'IN_PROGRESS').length,
+      inReview:   allTasks.filter(t => t.status === 'IN_REVIEW').length,
+      done:       allTasks.filter(t => t.status === 'DONE').length,
+    };
+    const allAssets = design?.assets ?? [];
+    const assetsCount    = allAssets.length;
+    const assetsApproved = allAssets.filter(a => a.approvedAt).length;
+    const briefDone      = !!(design?.brief);
+    const styleGuideDone = !!(design?.styleGuide);
+    const figmaLinked    = !!(design?.figmaUrl);
+    let gateStatus: DesignGateStatus;
+    if (entry?.status === 'APPROVED')                  gateStatus = 'approved';
+    else if (tasks.inReview > 0)                       gateStatus = 'in-review';
+    else if (assetsApproved === assetsCount && assetsCount > 0 && briefDone) gateStatus = 'pending-gate';
+    else if (entry?.status === 'IN_PROGRESS')          gateStatus = 'in-progress';
+    else                                               gateStatus = 'not-started';
+    return {
+      id: p.id, name: p.name, client: p.clientName,
+      clientInitials: p.clientName.slice(0, 2).toUpperCase(),
+      assignedTo: p.members.map(m => m.user.name.slice(0, 2).toUpperCase()),
+      gateStatus, briefDone, styleGuideDone, figmaLinked,
+      tasks, assetsCount, assetsApproved, daysInStage, targetDays,
+      lastUpdated: this.relativeTime(p.updatedAt), priority: 'medium',
+    };
+  }
+
+  private relativeTime(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime();
+    const days = Math.floor(diff / 86400000);
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    return `${days} days ago`;
   }
 
   protected approveGate(project: DesignProject) {

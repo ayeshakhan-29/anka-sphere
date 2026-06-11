@@ -1,6 +1,8 @@
-import { Component, signal, computed } from '@angular/core';
+import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Badge } from '../../ui';
+import { ProjectService } from '../../services/project.service';
+import { Project } from '../../models/project.models';
 
 type ContentGateStatus = 'not-started' | 'drafting' | 'in-review' | 'pending-gate' | 'approved' | 'overdue';
 
@@ -724,12 +726,15 @@ const MOCK_PROJECTS: ContentProject[] = [
     }
   `]
 })
-export class WrittenContentDept {
+export class WrittenContentDept implements OnInit {
+  private projectService = inject(ProjectService);
+
   protected search = signal('');
   protected activeFilter = signal<'all' | ContentGateStatus>('all');
   protected sort = signal<'priority' | 'overdue' | 'pages' | 'words'>('priority');
+  protected loading = signal(true);
 
-  protected projects = signal<ContentProject[]>(MOCK_PROJECTS);
+  protected projects = signal<ContentProject[]>([]);
 
   protected activeProjects = computed(() =>
     this.projects().filter(p => p.gateStatus !== 'approved')
@@ -827,6 +832,61 @@ export class WrittenContentDept {
       case 'drafting':      return 'Drafting';
       case 'not-started':   return 'Not Started';
     }
+  }
+
+  ngOnInit() {
+    this.projectService.getProjects().subscribe({
+      next: (projects) => {
+        this.projects.set(
+          projects
+            .filter(p => p.currentStage === 'WRITTEN_CONTENT')
+            .map(p => this.mapProject(p))
+        );
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false),
+    });
+  }
+
+  private mapProject(p: Project): ContentProject {
+    const entry = p.pipeline.find(e => e.stage === 'WRITTEN_CONTENT');
+    const daysInStage = entry?.startedAt
+      ? Math.floor((Date.now() - new Date(entry.startedAt).getTime()) / 86400000)
+      : 0;
+    const targetDays = 10;
+    const content = p.content;
+    const pages: ContentPage[] = (content?.pages ?? []).map(pg => ({
+      title: pg.title,
+      status: (pg.status.toLowerCase() === 'in_review' ? 'in-review' : pg.status.toLowerCase()) as ContentPage['status'],
+      wordCount: pg.wordCount ?? 0,
+    }));
+    const totalWords = pages.reduce((s, pg) => s + pg.wordCount, 0);
+    const briefDone = !!(content?.contentBrief);
+    const toneOfVoiceDone = !!(content?.toneOfVoice);
+    const approvedPages = pages.filter(pg => pg.status === 'approved').length;
+    let gateStatus: ContentGateStatus;
+    if (entry?.status === 'APPROVED')         gateStatus = 'approved';
+    else if (daysInStage > targetDays)        gateStatus = 'overdue';
+    else if (approvedPages === pages.length && pages.length > 0) gateStatus = 'pending-gate';
+    else if (pages.some(pg => pg.status === 'in-review'))        gateStatus = 'in-review';
+    else if (entry?.status === 'IN_PROGRESS') gateStatus = 'drafting';
+    else                                      gateStatus = 'not-started';
+    return {
+      id: p.id, name: p.name, client: p.clientName,
+      clientInitials: p.clientName.slice(0, 2).toUpperCase(),
+      assignedTo: p.members.map(m => m.user.name.slice(0, 2).toUpperCase()),
+      gateStatus, briefDone, toneOfVoiceDone, pages, totalWords,
+      daysInStage, targetDays,
+      lastUpdated: this.relativeTime(p.updatedAt), priority: 'medium',
+    };
+  }
+
+  private relativeTime(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime();
+    const days = Math.floor(diff / 86400000);
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    return `${days} days ago`;
   }
 
   protected approveGate(project: ContentProject) {

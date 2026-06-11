@@ -1,6 +1,8 @@
-import { Component, signal, computed, inject } from '@angular/core';
+import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Badge } from '../../ui';
+import { ProjectService } from '../../services/project.service';
+import { Project } from '../../models/project.models';
 
 type GateStatus = 'not-started' | 'in-progress' | 'pending-review' | 'approved' | 'overdue';
 
@@ -742,12 +744,15 @@ const MOCK_PROJECTS: ProfilingProject[] = [
     }
   `]
 })
-export class ProfilingDept {
+export class ProfilingDept implements OnInit {
+  private projectService = inject(ProjectService);
+
   protected search = signal('');
   protected activeFilter = signal<'all' | GateStatus>('all');
   protected sort = signal<'priority' | 'overdue' | 'completion' | 'updated'>('priority');
+  protected loading = signal(true);
 
-  protected projects = signal<ProfilingProject[]>(MOCK_PROJECTS);
+  protected projects = signal<ProfilingProject[]>([]);
 
   protected activeProjects = computed(() =>
     this.projects().filter(p => p.gateStatus !== 'approved')
@@ -836,6 +841,60 @@ export class ProfilingDept {
     }
   }
 
+  ngOnInit() {
+    this.projectService.getProjects().subscribe({
+      next: (projects) => {
+        this.projects.set(
+          projects
+            .filter(p => p.currentStage === 'PROFILING')
+            .map(p => this.mapProject(p))
+        );
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false),
+    });
+  }
+
+  private mapProject(p: Project): ProfilingProject {
+    const entry = p.pipeline.find(e => e.stage === 'PROFILING');
+    const daysInStage = entry?.startedAt
+      ? Math.floor((Date.now() - new Date(entry.startedAt).getTime()) / 86400000)
+      : 0;
+    const targetDays = 7;
+    const profiling = p.profiling;
+    const sections: SectionStatus = {
+      brief:       !!(profiling?.companyName && profiling?.about),
+      brand:       !!(profiling?.brandVoice),
+      personas:    profiling?.personas?.length ?? 0,
+      competitors: profiling?.competitors?.length ?? 0,
+      seo:         !!(profiling?.primaryKeywords),
+      timeline:    (p.milestones ?? []).filter(m => m.status === 'DONE').length,
+    };
+    const filled = [sections.brief, sections.brand, sections.seo].filter(Boolean).length;
+    const completionPct = Math.round((filled / 3) * 100);
+    let gateStatus: GateStatus;
+    if (entry?.status === 'APPROVED')         gateStatus = 'approved';
+    else if (daysInStage > targetDays)        gateStatus = 'overdue';
+    else if (completionPct === 100)           gateStatus = 'pending-review';
+    else if (entry?.status === 'IN_PROGRESS') gateStatus = 'in-progress';
+    else                                      gateStatus = 'not-started';
+    return {
+      id: p.id, name: p.name, client: p.clientName,
+      clientInitials: p.clientName.slice(0, 2).toUpperCase(),
+      assignedTo: p.members.map(m => m.user.name.slice(0, 2).toUpperCase()),
+      gateStatus, sections, completionPct, daysInStage, targetDays,
+      lastUpdated: this.relativeTime(p.updatedAt), priority: 'medium',
+    };
+  }
+
+  private relativeTime(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime();
+    const days = Math.floor(diff / 86400000);
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    return `${days} days ago`;
+  }
+
   protected approveGate(project: ProfilingProject) {
     this.projects.update(list =>
       list.map(p => p.id === project.id ? { ...p, gateStatus: 'approved' as GateStatus } : p)
@@ -843,7 +902,6 @@ export class ProfilingDept {
   }
 
   protected nudgeClient(project: ProfilingProject) {
-    // TODO: trigger email/in-app notification to client
     alert(`Reminder sent to ${project.client} for "${project.name}"`);
   }
 }
