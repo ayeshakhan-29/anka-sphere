@@ -135,6 +135,32 @@ export interface DevTask {
   sortOrder: number;
 }
 
+export type MarketingTaskCategory = 'CONTENT' | 'SOCIAL' | 'PAID' | 'SEO' | 'ANALYTICS' | 'OTHER';
+
+export interface MarketingTask {
+  id: string;
+  title: string;
+  description?: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  category?: MarketingTaskCategory;
+  assigneeName?: string;
+  dueDate?: string;
+  sortOrder: number;
+}
+
+export interface Marketing {
+  id: string;
+  projectId: string;
+  strategy?: string;
+  targetAudience?: string;
+  budget?: string;
+  channels?: string;
+  notes?: string;
+  completedAt?: string;
+  tasks: MarketingTask[];
+}
+
 export interface Development {
   id: string;
   projectId: string;
@@ -165,6 +191,7 @@ export interface Project {
   content?: WrittenContent;
   design?: Design;
   development?: Development;
+  marketing?: Marketing;
   _count?: { milestones: number };
 }
 

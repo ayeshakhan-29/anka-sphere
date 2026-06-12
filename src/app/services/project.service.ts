@@ -10,6 +10,8 @@ import {
   DesignAsset,
   Development,
   DevTask,
+  Marketing,
+  MarketingTask,
   Milestone,
   Persona,
   Competitor,
@@ -194,5 +196,31 @@ export class ProjectService {
 
   deleteDevTask(projectId: string, taskId: string) {
     return this.api.delete<void>(`/projects/${projectId}/development/tasks/${taskId}`);
+  }
+
+  // ── Marketing ─────────────────────────────────────────────────────────────
+
+  getMarketing(projectId: string) {
+    return this.api.get<Marketing>(`/projects/${projectId}/marketing`);
+  }
+
+  upsertMarketing(projectId: string, data: Partial<Marketing>) {
+    return this.api.put<Marketing>(`/projects/${projectId}/marketing`, data);
+  }
+
+  completeMarketing(projectId: string) {
+    return this.api.post<{ message: string; warnings: string[] }>(`/projects/${projectId}/marketing/complete`, {});
+  }
+
+  createMarketingTask(projectId: string, data: Omit<MarketingTask, 'id'>) {
+    return this.api.post<MarketingTask>(`/projects/${projectId}/marketing/tasks`, data);
+  }
+
+  updateMarketingTask(projectId: string, taskId: string, data: Partial<MarketingTask>) {
+    return this.api.patch<MarketingTask>(`/projects/${projectId}/marketing/tasks/${taskId}`, data);
+  }
+
+  deleteMarketingTask(projectId: string, taskId: string) {
+    return this.api.delete<void>(`/projects/${projectId}/marketing/tasks/${taskId}`);
   }
 }
