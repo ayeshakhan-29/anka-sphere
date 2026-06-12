@@ -8,6 +8,8 @@ import {
   Design,
   DesignTask,
   DesignAsset,
+  Development,
+  DevTask,
   Milestone,
   Persona,
   Competitor,
@@ -166,5 +168,31 @@ export class ProjectService {
 
   deleteDesignAsset(projectId: string, assetId: string) {
     return this.api.delete<void>(`/projects/${projectId}/design/assets/${assetId}`);
+  }
+
+  // ── Development ───────────────────────────────────────────────────────────
+
+  getDevelopment(projectId: string) {
+    return this.api.get<Development>(`/projects/${projectId}/development`);
+  }
+
+  upsertDevelopment(projectId: string, data: Partial<Development>) {
+    return this.api.put<Development>(`/projects/${projectId}/development`, data);
+  }
+
+  completeDevelopment(projectId: string) {
+    return this.api.post<{ message: string; warnings: string[] }>(`/projects/${projectId}/development/complete`, {});
+  }
+
+  createDevTask(projectId: string, data: Omit<DevTask, 'id'>) {
+    return this.api.post<DevTask>(`/projects/${projectId}/development/tasks`, data);
+  }
+
+  updateDevTask(projectId: string, taskId: string, data: Partial<DevTask>) {
+    return this.api.patch<DevTask>(`/projects/${projectId}/development/tasks/${taskId}`, data);
+  }
+
+  deleteDevTask(projectId: string, taskId: string) {
+    return this.api.delete<void>(`/projects/${projectId}/development/tasks/${taskId}`);
   }
 }

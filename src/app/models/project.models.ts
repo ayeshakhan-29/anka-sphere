@@ -124,6 +124,29 @@ export interface Design {
   assets: DesignAsset[];
 }
 
+export interface DevTask {
+  id: string;
+  title: string;
+  description?: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  assigneeName?: string;
+  dueDate?: string;
+  sortOrder: number;
+}
+
+export interface Development {
+  id: string;
+  projectId: string;
+  techStack?: string;
+  repoUrl?: string;
+  stagingUrl?: string;
+  liveUrl?: string;
+  notes?: string;
+  completedAt?: string;
+  tasks: DevTask[];
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -141,6 +164,7 @@ export interface Project {
   profiling?: ProjectProfiling;
   content?: WrittenContent;
   design?: Design;
+  development?: Development;
   _count?: { milestones: number };
 }
 
