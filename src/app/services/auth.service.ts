@@ -81,6 +81,24 @@ export class AuthService {
     );
   }
 
+  canApproveStage(stage: string): boolean {
+    const role = this._user()?.role;
+    if (!role) return false;
+    if (role === 'ADMIN') return true;
+    switch (stage) {
+      case 'PROFILING':
+      case 'WRITTEN_CONTENT':
+      case 'DESIGN':
+        return role === 'MANAGER_PRODUCT_MODELLING';
+      case 'DEVELOPMENT':
+        return role === 'MANAGER_PRODUCT_DEVELOPMENT';
+      case 'MARKETING':
+        return role === 'MANAGER_PRODUCT_GROWTH';
+      default:
+        return false;
+    }
+  }
+
   private loadUser(): AuthUser | null {
     try {
       const raw = localStorage.getItem('user');

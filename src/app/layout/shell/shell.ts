@@ -3,6 +3,8 @@ import { RouterLink, RouterLinkActive, RouterOutlet, Router, NavigationStart, Na
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
+import { NotificationService } from '../../services/notification.service';
+import { Toast } from '../../ui';
 
 interface NavItem {
   label: string;
@@ -18,7 +20,7 @@ interface NavGroup {
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Toast],
   template: `
     <div class="shell">
 
@@ -112,12 +114,82 @@ interface NavGroup {
             <h1 class="page-title">{{ pageTitle() }}</h1>
           </div>
           <div class="topbar-right">
-            <button class="icon-btn" aria-label="Notifications">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-              </svg>
-            </button>
+            <!-- Notification bell -->
+            <div class="notif-wrap" #notifWrap>
+              <button
+                class="icon-btn"
+                [class.icon-btn--active]="panelOpen()"
+                (click)="togglePanel()"
+                aria-label="Notifications"
+                [attr.aria-expanded]="panelOpen()"
+                aria-haspopup="true"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+                @if (notifService.unreadCount() > 0) {
+                  <span class="notif-badge" aria-label="{{ notifService.unreadCount() }} unread notifications">
+                    {{ notifService.unreadCount() > 9 ? '9+' : notifService.unreadCount() }}
+                  </span>
+                }
+              </button>
+
+              <!-- Notification panel -->
+              @if (panelOpen()) {
+                <div class="notif-backdrop" (click)="panelOpen.set(false)" aria-hidden="true"></div>
+                <div class="notif-panel" role="dialog" aria-label="Notifications" aria-modal="false">
+                  <div class="notif-panel-header">
+                    <span class="notif-panel-title">Notifications</span>
+                    @if (notifService.unreadCount() > 0) {
+                      <button class="notif-mark-all" (click)="notifService.markAllRead()">Mark all read</button>
+                    }
+                  </div>
+
+                  <div class="notif-list" role="list">
+                    @for (n of notifService.notifications(); track n.id) {
+                      <button
+                        class="notif-item"
+                        [class.notif-item--unread]="!n.read"
+                        role="listitem"
+                        (click)="openNotification(n)"
+                        [attr.aria-label]="n.title + ': ' + n.body + (n.read ? '' : ' (unread)')"
+                      >
+                        <span class="notif-icon" [class]="'notif-icon--' + n.type" aria-hidden="true">
+                          @if (n.type === 'gate_approved' || n.type === 'stage_unlocked') {
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                          } @else if (n.type === 'gate_pending') {
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                          } @else {
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                          }
+                        </span>
+                        <span class="notif-body">
+                          <span class="notif-title">{{ n.title }}</span>
+                          <span class="notif-desc">{{ n.body }}</span>
+                          <span class="notif-time">{{ relativeTime(n.createdAt) }}</span>
+                        </span>
+                        @if (!n.read) {
+                          <span class="notif-unread-dot" aria-hidden="true"></span>
+                        }
+                      </button>
+                    } @empty {
+                      <div class="notif-empty" role="status">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                        </svg>
+                        <p>No notifications yet</p>
+                      </div>
+                    }
+                  </div>
+
+                  <div class="notif-panel-footer">
+                    <span class="notif-count">{{ notifService.notifications().length }} total</span>
+                  </div>
+                </div>
+              }
+            </div>
           </div>
         </header>
 
@@ -128,6 +200,9 @@ interface NavGroup {
 
       </div>
     </div>
+
+    <!-- Toast overlay -->
+    <app-toast />
   `,
   styles: [`
     .shell {
@@ -346,7 +421,11 @@ interface NavGroup {
       align-items: center;
       gap: 8px;
     }
+    .notif-wrap {
+      position: relative;
+    }
     .icon-btn {
+      position: relative;
       width: 36px;
       height: 36px;
       border-radius: 8px;
@@ -359,9 +438,177 @@ interface NavGroup {
       cursor: pointer;
       transition: background 0.15s, color 0.15s;
     }
-    .icon-btn:hover {
+    .icon-btn:hover, .icon-btn--active {
       background: var(--color-surface-raised);
       color: var(--color-text);
+    }
+    .notif-badge {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      min-width: 17px;
+      height: 17px;
+      padding: 0 4px;
+      border-radius: 10px;
+      background: #EF4444;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      border: 2px solid var(--color-surface);
+    }
+
+    /* Notification panel */
+    .notif-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 199;
+    }
+    .notif-panel {
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 0;
+      width: 360px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.16);
+      z-index: 200;
+      overflow: hidden;
+      animation: panel-in 0.15s ease;
+    }
+    @keyframes panel-in {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .notif-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid var(--color-border);
+    }
+    .notif-panel-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--color-text);
+    }
+    .notif-mark-all {
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--color-accent);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      transition: opacity 0.15s;
+    }
+    .notif-mark-all:hover { opacity: 0.75; }
+
+    .notif-list {
+      max-height: 360px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+    .notif-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      width: 100%;
+      padding: 12px 16px;
+      border: none;
+      border-bottom: 1px solid var(--color-border);
+      background: transparent;
+      cursor: pointer;
+      text-align: left;
+      font-family: var(--font-sans);
+      transition: background 0.12s;
+    }
+    .notif-item:last-child { border-bottom: none; }
+    .notif-item:hover { background: var(--color-surface-raised); }
+    .notif-item--unread { background: rgba(22,163,74,0.04); }
+    .notif-item--unread:hover { background: rgba(22,163,74,0.08); }
+
+    .notif-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .notif-icon--gate_approved, .notif-icon--stage_unlocked {
+      background: rgba(22,163,74,0.12);
+      color: #16A34A;
+    }
+    .notif-icon--gate_pending {
+      background: rgba(245,158,11,0.12);
+      color: #D97706;
+    }
+    .notif-icon--info {
+      background: rgba(99,102,241,0.12);
+      color: #6366F1;
+    }
+
+    .notif-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .notif-title {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+    .notif-desc {
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      line-height: 1.4;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .notif-time {
+      font-size: 11px;
+      color: var(--color-text-muted);
+      margin-top: 2px;
+    }
+    .notif-unread-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--color-accent);
+      flex-shrink: 0;
+      margin-top: 6px;
+    }
+
+    .notif-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 32px 16px;
+      color: var(--color-text-muted);
+      font-size: 13px;
+    }
+    .notif-empty p { margin: 0; }
+
+    .notif-panel-footer {
+      padding: 10px 16px;
+      border-top: 1px solid var(--color-border);
+      background: var(--color-surface-raised);
+    }
+    .notif-count {
+      font-size: 11.5px;
+      color: var(--color-text-muted);
     }
 
     /* Page content */
@@ -481,6 +728,8 @@ export class Shell implements OnInit, OnDestroy {
 
   private router = inject(Router);
   private auth = inject(AuthService);
+  protected notifService = inject(NotificationService);
+  protected panelOpen = signal(false);
 
   ngOnInit() {
     this.routerSub = this.router.events.subscribe(event => {
@@ -511,6 +760,28 @@ export class Shell implements OnInit, OnDestroy {
 
   protected toggleSidebar() {
     this.sidebarCollapsed.update(v => !v);
+  }
+
+  protected togglePanel() {
+    this.panelOpen.update(v => !v);
+  }
+
+  protected openNotification(n: { id: string; route: string; read: boolean }) {
+    this.notifService.markRead(n.id);
+    this.panelOpen.set(false);
+    this.router.navigateByUrl(n.route);
+  }
+
+  protected relativeTime(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins  = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days  = Math.floor(diff / 86400000);
+    if (mins  < 1)  return 'just now';
+    if (mins  < 60) return `${mins}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days  < 7)  return `${days}d ago`;
+    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   }
 
   protected logout() {

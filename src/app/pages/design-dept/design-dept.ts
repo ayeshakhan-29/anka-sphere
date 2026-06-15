@@ -2,6 +2,7 @@ import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Badge } from '../../ui';
 import { ProjectService } from '../../services/project.service';
+import { NotificationService } from '../../services/notification.service';
 import { Project } from '../../models/project.models';
 
 type DesignGateStatus = 'not-started' | 'in-progress' | 'in-review' | 'pending-gate' | 'approved';
@@ -347,7 +348,7 @@ const MOCK_PROJECTS: DesignProject[] = [
     </div>
   `,
   styles: [`
-    .dd-page { max-width: 1200px; }
+    .dd-page { width: 100%; }
 
     .dd-header {
       display: flex;
@@ -719,6 +720,7 @@ const MOCK_PROJECTS: DesignProject[] = [
 })
 export class DesignDept implements OnInit {
   private projectService = inject(ProjectService);
+  private notifService = inject(NotificationService);
 
   protected search = signal('');
   protected activeFilter = signal<'all' | DesignGateStatus>('all');

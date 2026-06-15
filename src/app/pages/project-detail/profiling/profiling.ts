@@ -4,6 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Badge } from '../../../ui';
 import { ProjectService } from '../../../services/project.service';
 import { ProjectStateService } from '../../../services/project-state.service';
+import { NotificationService } from '../../../services/notification.service';
 
 type TabId = 'brief' | 'brand' | 'personas' | 'competitors' | 'seo' | 'timeline';
 
@@ -658,6 +659,7 @@ export class Profiling implements OnInit {
   private route = inject(ActivatedRoute);
   private projectService = inject(ProjectService);
   private state = inject(ProjectStateService);
+  private notifService = inject(NotificationService);
 
   private get projectId(): string {
     return this.route.parent?.snapshot.paramMap.get('id') ?? '';
@@ -846,6 +848,15 @@ export class Profiling implements OnInit {
         this.gateLoading.set(false);
         this.projectService.getProject(this.projectId)
           .subscribe(p => this.state.setProject(p));
+        const name = this.state.project()?.name ?? 'Project';
+        this.notifService.add({
+          type: 'stage_unlocked',
+          title: 'Profiling gate approved',
+          body: `${name} — Written Content is now unlocked`,
+          projectId: this.projectId,
+          projectName: name,
+          route: `/app/projects/${this.projectId}/content`,
+        });
       },
       error: (err) => {
         this.gateError.set(err?.error?.error ?? 'Gate approval failed.');

@@ -2,6 +2,7 @@ import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Badge } from '../../ui';
 import { ProjectService } from '../../services/project.service';
+import { NotificationService } from '../../services/notification.service';
 import { Project } from '../../models/project.models';
 
 type ContentGateStatus = 'not-started' | 'drafting' | 'in-review' | 'pending-gate' | 'approved' | 'overdue';
@@ -365,7 +366,7 @@ const MOCK_PROJECTS: ContentProject[] = [
     </div>
   `,
   styles: [`
-    .wcd-page { max-width: 1200px; }
+    .wcd-page { width: 100%; }
 
     .wcd-header {
       display: flex;
@@ -728,6 +729,7 @@ const MOCK_PROJECTS: ContentProject[] = [
 })
 export class WrittenContentDept implements OnInit {
   private projectService = inject(ProjectService);
+  private notifService = inject(NotificationService);
 
   protected search = signal('');
   protected activeFilter = signal<'all' | ContentGateStatus>('all');
@@ -896,6 +898,6 @@ export class WrittenContentDept implements OnInit {
   }
 
   protected nudge(project: ContentProject) {
-    alert(`Reminder sent to team for "${project.name}"`);
+    this.notifService.toast(`Reminder sent to team for "${project.name}"`, 'info');
   }
 }

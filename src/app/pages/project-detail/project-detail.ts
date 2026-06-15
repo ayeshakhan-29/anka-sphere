@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy, computed } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, computed, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Badge } from '../../ui';
 import { ProjectService } from '../../services/project.service';
@@ -75,6 +75,132 @@ import { ProjectStateService } from '../../services/project-state.service';
           </div>
         </div>
 
+        <!-- Project Context (collapsible) -->
+        @if (profilingData()) {
+          <div class="ctx-panel" [class.ctx-panel--open]="contextOpen()">
+            <button
+              class="ctx-toggle"
+              type="button"
+              (click)="contextOpen.set(!contextOpen())"
+              [attr.aria-expanded]="contextOpen()"
+              aria-controls="project-context-body"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 16v-4M12 8h.01"/></svg>
+              Project Context
+              <span class="ctx-hint">{{ contextOpen() ? 'Collapse' : 'Expand — company brief, brand voice, personas' }}</span>
+              <svg class="ctx-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+
+            @if (contextOpen()) {
+              <div class="ctx-body" id="project-context-body">
+                @let p = profilingData()!;
+
+                <!-- Company header -->
+                @if (p.companyName || p.industry) {
+                  <div class="ctx-company">
+                    @if (p.companyName) { <span class="ctx-company-name">{{ p.companyName }}</span> }
+                    @if (p.industry) { <span class="ctx-tag">{{ p.industry }}</span> }
+                  </div>
+                }
+
+                <!-- About -->
+                @if (p.about) {
+                  <div class="ctx-section">
+                    <p class="ctx-section-label">About the Company</p>
+                    <p class="ctx-text">{{ p.about }}</p>
+                  </div>
+                }
+
+                <!-- Objectives + Brand Voice side by side -->
+                @if (p.objectives || p.brandVoice || p.toneOfVoice) {
+                  <div class="ctx-cols">
+                    @if (p.objectives) {
+                      <div class="ctx-section">
+                        <p class="ctx-section-label">Objectives</p>
+                        <p class="ctx-text">{{ p.objectives }}</p>
+                      </div>
+                    }
+                    @if (p.brandVoice || p.toneOfVoice) {
+                      <div class="ctx-section">
+                        <p class="ctx-section-label">Brand Voice &amp; Tone</p>
+                        @if (p.brandVoice) { <p class="ctx-text">{{ p.brandVoice }}</p> }
+                        @if (p.toneOfVoice) { <p class="ctx-text">{{ p.toneOfVoice }}</p> }
+                      </div>
+                    }
+                  </div>
+                }
+
+                <!-- Keywords -->
+                @if (p.primaryKeywords || p.secondaryKeywords) {
+                  <div class="ctx-section">
+                    <p class="ctx-section-label">Keywords</p>
+                    <div class="ctx-tags">
+                      @for (kw of splitKeywords(p.primaryKeywords ?? ''); track kw) {
+                        <span class="ctx-tag ctx-tag--primary">{{ kw }}</span>
+                      }
+                      @for (kw of splitKeywords(p.secondaryKeywords ?? ''); track kw) {
+                        <span class="ctx-tag">{{ kw }}</span>
+                      }
+                    </div>
+                  </div>
+                }
+
+                <!-- Personas -->
+                @if (p.personas && p.personas.length > 0) {
+                  <div class="ctx-section">
+                    <p class="ctx-section-label">Personas ({{ p.personas.length }})</p>
+                    <div class="ctx-personas">
+                      @for (persona of p.personas; track persona.id) {
+                        <div class="persona-card">
+                          <div class="persona-avatar" aria-hidden="true">{{ persona.name.slice(0, 1) }}</div>
+                          <div class="persona-info">
+                            <span class="persona-name">{{ persona.name }}</span>
+                            @if (persona.age || persona.role) {
+                              <span class="persona-meta">
+                                @if (persona.age) { {{ persona.age }} · }
+                                @if (persona.role) { {{ persona.role }} }
+                              </span>
+                            }
+                            @if (persona.goals) {
+                              <span class="persona-detail"><strong>Goals:</strong> {{ persona.goals }}</span>
+                            }
+                            @if (persona.painPoints) {
+                              <span class="persona-detail"><strong>Pain points:</strong> {{ persona.painPoints }}</span>
+                            }
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+
+                <!-- Competitors -->
+                @if (p.competitors && p.competitors.length > 0) {
+                  <div class="ctx-section">
+                    <p class="ctx-section-label">Competitors ({{ p.competitors.length }})</p>
+                    <div class="ctx-competitors">
+                      @for (comp of p.competitors; track comp.id) {
+                        <div class="comp-card">
+                          <div class="comp-top">
+                            <span class="comp-name">{{ comp.name }}</span>
+                            @if (comp.url) {
+                              <a [href]="comp.url" target="_blank" rel="noopener noreferrer" class="comp-link" [attr.aria-label]="'Visit ' + comp.name">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                              </a>
+                            }
+                          </div>
+                          @if (comp.strengths) { <p class="comp-detail"><strong>Strengths:</strong> {{ comp.strengths }}</p> }
+                          @if (comp.weaknesses) { <p class="comp-detail"><strong>Weaknesses:</strong> {{ comp.weaknesses }}</p> }
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+
         <!-- Info + Team -->
         <div class="meta-row">
           <div class="info-card">
@@ -125,13 +251,32 @@ import { ProjectStateService } from '../../services/project-state.service';
         <!-- Department tabs -->
         <div class="dept-tabs-section">
           <div class="dept-tabs" role="tablist" aria-label="Department workspaces">
-            @for (tab of deptTabs; track tab.route) {
-              <a
-                [routerLink]="tab.route"
-                routerLinkActive="active"
-                class="dept-tab"
-                role="tab"
-              >{{ tab.label }}</a>
+            @for (tab of deptTabs(); track tab.route) {
+              @if (tab.locked) {
+                <span
+                  class="dept-tab dept-tab--locked"
+                  role="tab"
+                  [attr.aria-disabled]="true"
+                  [attr.aria-label]="tab.label + ' — locked'"
+                  [title]="tab.lockedReason"
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                  {{ tab.label }}
+                </span>
+              } @else {
+                <a
+                  [routerLink]="tab.route"
+                  routerLinkActive="active"
+                  class="dept-tab"
+                  [class.dept-tab--current]="tab.current"
+                  role="tab"
+                >
+                  {{ tab.label }}
+                  @if (tab.current) {
+                    <span class="current-dot" aria-label="Current stage" aria-hidden="true"></span>
+                  }
+                </a>
+              }
             }
           </div>
           <div class="dept-content">
@@ -281,10 +426,66 @@ import { ProjectStateService } from '../../services/project-state.service';
     }
     .dept-tab:hover { color: var(--color-text); }
     .dept-tab.active { color: var(--color-text); border-bottom-color: var(--color-accent); }
+    .dept-tab--locked {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 12px 16px; font-size: 13px; font-weight: 500;
+      color: var(--color-text-muted); opacity: 0.5;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      white-space: nowrap; cursor: not-allowed; user-select: none;
+    }
+    .dept-tab--current {
+      color: var(--color-text);
+      font-weight: 600;
+    }
+    .current-dot {
+      display: inline-block; width: 6px; height: 6px;
+      border-radius: 50%; background: var(--color-accent);
+      margin-left: 4px; vertical-align: middle;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
     .dept-content { padding: 24px; }
+
+    /* Project Context panel */
+    .ctx-panel { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); overflow: hidden; }
+    .ctx-toggle {
+      width: 100%; display: flex; align-items: center; gap: 8px;
+      padding: 12px 20px; background: none; border: none; cursor: pointer;
+      font-family: var(--font-sans); font-size: 13px; font-weight: 600;
+      color: var(--color-text-secondary); text-align: left; transition: background 0.12s;
+    }
+    .ctx-toggle:hover { background: var(--color-surface-raised); }
+    .ctx-hint { flex: 1; font-size: 12px; font-weight: 400; color: var(--color-text-muted); }
+    .ctx-chevron { color: var(--color-text-muted); transition: transform 0.2s; }
+    .ctx-panel--open .ctx-chevron { transform: rotate(180deg); }
+    .ctx-body { padding: 0 20px 20px; display: flex; flex-direction: column; gap: 18px; border-top: 1px solid var(--color-border); padding-top: 18px; }
+    .ctx-section { display: flex; flex-direction: column; gap: 6px; }
+    .ctx-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .ctx-section-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-text-muted); margin: 0; }
+    .ctx-text { font-size: 13.5px; color: var(--color-text-secondary); line-height: 1.65; margin: 0; }
+    .ctx-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .ctx-tag { font-size: 12px; padding: 3px 10px; border-radius: 12px; background: var(--color-surface-raised); border: 1px solid var(--color-border); color: var(--color-text-secondary); }
+    .ctx-tag--primary { background: #EFF6FF; border-color: #BFDBFE; color: #2563EB; font-weight: 500; }
+    .ctx-company { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; }
+    .ctx-company-name { font-size: 15px; font-weight: 700; color: var(--color-text); }
+    .ctx-personas { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+    .persona-card { display: flex; gap: 10px; padding: 12px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+    .persona-avatar { width: 32px; height: 32px; min-width: 32px; border-radius: 50%; background: #EDE9FE; color: #7C3AED; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+    .persona-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    .persona-name { font-size: 13px; font-weight: 600; color: var(--color-text); }
+    .persona-meta { font-size: 11.5px; color: var(--color-text-muted); }
+    .persona-detail { font-size: 12px; color: var(--color-text-secondary); line-height: 1.5; }
+    .ctx-competitors { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+    .comp-card { padding: 12px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 6px; }
+    .comp-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .comp-name { font-size: 13px; font-weight: 600; color: var(--color-text); }
+    .comp-link { color: var(--color-text-muted); text-decoration: none; display: flex; align-items: center; transition: color 0.12s; }
+    .comp-link:hover { color: var(--color-accent); }
+    .comp-detail { font-size: 12px; color: var(--color-text-secondary); margin: 0; line-height: 1.5; }
 
     @media (max-width: 768px) {
       .meta-row { grid-template-columns: 1fr; }
+      .ctx-cols { grid-template-columns: 1fr; }
     }
   `]
 })
@@ -296,15 +497,41 @@ export class ProjectDetail implements OnInit, OnDestroy {
   protected loadError = computed(() => this.state.loading() ? null : (this.state.project() ? null : this._error));
   private _error: string | null = null;
 
-  protected deptTabs = [
-    { label: 'Overview',          route: 'overview' },
-    { label: 'Project Profiling', route: 'profiling' },
-    { label: 'Written Content',   route: 'content' },
-    { label: 'Design',            route: 'design' },
-    { label: 'Development',       route: 'development' },
-    { label: 'Analytics',         route: 'analytics' },
-    { label: 'Reporting',         route: 'reporting' },
-  ];
+  protected contextOpen  = signal(false);
+  protected profilingData = computed(() => {
+    const p = this.state.project()?.profiling;
+    if (!p) return null;
+    const hasContent = p.about || p.objectives || p.brandVoice || p.toneOfVoice ||
+      p.primaryKeywords || p.secondaryKeywords ||
+      (p.personas?.length ?? 0) > 0 || (p.competitors?.length ?? 0) > 0;
+    return hasContent ? p : null;
+  });
+
+  private stageStatus(stageKey: string): string {
+    return this.state.project()?.pipeline.find(e => e.stage === stageKey)?.status ?? 'LOCKED';
+  }
+
+  protected deptTabs = computed(() => {
+    const project = this.state.project();
+    const current = project?.currentStage;
+    const s = (key: string) => this.stageStatus(key);
+
+    const locked = (key: string, reason: string) => ({
+      locked: s(key) === 'LOCKED',
+      current: current === key,
+      lockedReason: reason,
+    });
+
+    return [
+      { label: 'Overview',          route: 'overview',     locked: false, current: false, lockedReason: '' },
+      { label: 'Project Profiling', route: 'profiling',    ...locked('PROFILING',       'Stage not yet started') },
+      { label: 'Written Content',   route: 'content',      ...locked('WRITTEN_CONTENT', 'Requires Profiling gate approval') },
+      { label: 'Design',            route: 'design',       ...locked('DESIGN',          'Requires Written Content gate approval') },
+      { label: 'Development',       route: 'development',  ...locked('DEVELOPMENT',     'Requires Design gate approval') },
+      { label: 'Analytics',         route: 'analytics',    ...locked('MARKETING',       'Requires Development gate approval') },
+      { label: 'Reporting',         route: 'reporting',    locked: false, current: false, lockedReason: '' },
+    ];
+  });
 
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id') ?? '';
@@ -345,6 +572,10 @@ export class ProjectDetail implements OnInit, OnDestroy {
   protected formatDate(iso?: string): string {
     if (!iso) return '—';
     return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  protected splitKeywords(raw: string): string[] {
+    return raw.split(/[,\n]+/).map(k => k.trim()).filter(Boolean);
   }
 
   protected relativeTime(iso: string): string {

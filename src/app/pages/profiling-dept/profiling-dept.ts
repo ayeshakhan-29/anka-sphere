@@ -2,6 +2,7 @@ import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Badge } from '../../ui';
 import { ProjectService } from '../../services/project.service';
+import { NotificationService } from '../../services/notification.service';
 import { Project } from '../../models/project.models';
 
 type GateStatus = 'not-started' | 'in-progress' | 'pending-review' | 'approved' | 'overdue';
@@ -335,7 +336,7 @@ const MOCK_PROJECTS: ProfilingProject[] = [
     </div>
   `,
   styles: [`
-    .pd-page { max-width: 1200px; }
+    .pd-page { width: 100%; }
 
     /* ───── Header ───── */
     .pd-header {
@@ -746,6 +747,7 @@ const MOCK_PROJECTS: ProfilingProject[] = [
 })
 export class ProfilingDept implements OnInit {
   private projectService = inject(ProjectService);
+  private notifService = inject(NotificationService);
 
   protected search = signal('');
   protected activeFilter = signal<'all' | GateStatus>('all');
@@ -902,6 +904,6 @@ export class ProfilingDept implements OnInit {
   }
 
   protected nudgeClient(project: ProfilingProject) {
-    alert(`Reminder sent to ${project.client} for "${project.name}"`);
+    this.notifService.toast(`Reminder sent to ${project.client} for "${project.name}"`, 'info');
   }
 }

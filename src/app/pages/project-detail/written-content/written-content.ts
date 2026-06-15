@@ -4,6 +4,8 @@ import { ActivatedRoute } from '@angular/router';
 import { Badge } from '../../../ui';
 import { ProjectService } from '../../../services/project.service';
 import { ProjectStateService } from '../../../services/project-state.service';
+import { AuthService } from '../../../services/auth.service';
+import { NotificationService } from '../../../services/notification.service';
 
 type TabId = 'brief' | 'pages' | 'review';
 type PageStatus = 'DRAFT' | 'IN_REVIEW' | 'APPROVED' | 'REVISION';
@@ -680,6 +682,9 @@ export class WrittenContent implements OnInit {
   private route = inject(ActivatedRoute);
   private projectService = inject(ProjectService);
   private state = inject(ProjectStateService);
+  private auth  = inject(AuthService);
+  private notifService = inject(NotificationService);
+  protected canApprove = computed(() => this.auth.canApproveStage('WRITTEN_CONTENT'));
 
   private get projectId(): string {
     return this.route.parent?.snapshot.paramMap.get('id') ?? '';
@@ -810,6 +815,15 @@ export class WrittenContent implements OnInit {
         this.gateSubmitting.set(false);
         this.gateSuccess.set(true);
         this.projectService.getProject(this.projectId).subscribe(p => this.state.setProject(p));
+        const name = this.state.project()?.name ?? 'Project';
+        this.notifService.add({
+          type: 'stage_unlocked',
+          title: 'Written Content gate approved',
+          body: `${name} — Design is now unlocked`,
+          projectId: this.projectId,
+          projectName: name,
+          route: `/app/projects/${this.projectId}/design`,
+        });
       },
       error: (err) => {
         this.gateError.set(err?.error?.error ?? 'Gate approval failed.');

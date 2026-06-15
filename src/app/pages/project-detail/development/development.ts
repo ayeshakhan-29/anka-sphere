@@ -4,8 +4,12 @@ import { ActivatedRoute } from '@angular/router';
 import { Badge } from '../../../ui';
 import { ProjectService } from '../../../services/project.service';
 import { ProjectStateService } from '../../../services/project-state.service';
+import { AuthService } from '../../../services/auth.service';
+import { NotificationService } from '../../../services/notification.service';
+import { DesignAsset, ContentPage } from '../../../models/project.models';
 
-type TabId = 'brief' | 'kanban' | 'gate';
+type TabId = 'brief' | 'kanban' | 'assets' | 'content' | 'gate';
+type AssetType = DesignAsset['type'];
 type TaskStatus   = 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE';
 type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -225,6 +229,96 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
                 </div>
               }
             </div>
+          </section>
+        }
+
+        <!-- Design Assets tab -->
+        @if (activeTab() === 'assets') {
+          <section aria-label="Shared Design Assets">
+            <div class="shared-header">
+              <div>
+                <h4 class="shared-title">Design Assets</h4>
+                <p class="shared-sub">Approved assets from the Design stage — read-only</p>
+              </div>
+              <span class="shared-badge">{{ approvedAssets().length }} approved</span>
+            </div>
+            @if (approvedAssets().length === 0) {
+              <div class="shared-empty" role="status">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <p>No approved assets yet. Assets become available once the Design gate is approved.</p>
+              </div>
+            } @else {
+              <div class="asset-grid" role="list">
+                @for (asset of approvedAssets(); track asset.id) {
+                  <div class="asset-card" role="listitem">
+                    <div class="asset-icon" [class]="'asset-icon--' + asset.type.toLowerCase()" [innerHTML]="assetIcon(asset.type)" aria-hidden="true"></div>
+                    <div class="asset-info">
+                      <span class="asset-name">{{ asset.name }}</span>
+                      <div class="asset-meta">
+                        <span class="asset-type-badge">{{ asset.type }}</span>
+                        <span class="asset-version">v{{ asset.version }}</span>
+                      </div>
+                      @if (asset.notes) {
+                        <span class="asset-notes">{{ asset.notes }}</span>
+                      }
+                      @if (asset.approvedAt) {
+                        <span class="asset-approved">Approved {{ formatDate(asset.approvedAt) }}</span>
+                      }
+                    </div>
+                    <a
+                      [href]="asset.url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="asset-link"
+                      [attr.aria-label]="'Open ' + asset.name"
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    </a>
+                  </div>
+                }
+              </div>
+            }
+          </section>
+        }
+
+        <!-- Approved Content tab -->
+        @if (activeTab() === 'content') {
+          <section aria-label="Shared Content">
+            <div class="shared-header">
+              <div>
+                <h4 class="shared-title">Approved Content</h4>
+                <p class="shared-sub">Approved pages from the Written Content stage — read-only</p>
+              </div>
+              <span class="shared-badge">{{ approvedPages().length }} approved</span>
+            </div>
+            @if (approvedPages().length === 0) {
+              <div class="shared-empty" role="status">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                <p>No approved pages yet. Pages appear here once the Written Content gate is approved.</p>
+              </div>
+            } @else {
+              <div class="content-list" role="list">
+                @for (page of approvedPages(); track page.id) {
+                  <div class="content-row" role="listitem">
+                    <div class="content-row-left">
+                      <span class="content-title">{{ page.title }}</span>
+                      @if (page.slug) {
+                        <span class="content-slug">/{{ page.slug }}</span>
+                      }
+                      @if (page.metaTitle) {
+                        <span class="content-meta-title">Meta: {{ page.metaTitle }}</span>
+                      }
+                    </div>
+                    <div class="content-row-right">
+                      @if (page.wordCount) {
+                        <span class="content-words">{{ page.wordCount.toLocaleString() }} words</span>
+                      }
+                      <span class="content-status-badge">Approved</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            }
           </section>
         }
 
@@ -468,6 +562,44 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
     .gate-success { font-size: 12.5px; color: var(--color-accent); font-weight: 500; margin: 0; }
     .spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Shared tabs (Design Assets + Content) */
+    .shared-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
+    .shared-title { font-size: 15px; font-weight: 600; color: var(--color-text); margin: 0 0 4px; }
+    .shared-sub { font-size: 12.5px; color: var(--color-text-muted); margin: 0; }
+    .shared-badge { height: 22px; padding: 0 10px; background: #EFF6FF; color: #3B82F6; font-size: 11px; font-weight: 700; border-radius: 11px; display: flex; align-items: center; white-space: nowrap; }
+
+    .shared-empty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 48px 24px; color: var(--color-text-muted); text-align: center; border: 1.5px dashed var(--color-border); border-radius: var(--radius-lg); }
+    .shared-empty p { font-size: 13.5px; max-width: 340px; margin: 0; line-height: 1.6; }
+
+    .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+    .asset-card { display: flex; align-items: flex-start; gap: 12px; padding: 14px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); transition: border-color 0.15s; }
+    .asset-card:hover { border-color: var(--color-border-strong); }
+    .asset-icon { width: 36px; height: 36px; min-width: 36px; border-radius: 8px; background: var(--color-surface-raised); display: flex; align-items: center; justify-content: center; color: var(--color-text-muted); }
+    .asset-icon--image { background: #EFF6FF; color: #3B82F6; }
+    .asset-icon--video { background: #FEF3C7; color: #D97706; }
+    .asset-icon--font  { background: #F3E8FF; color: #9333EA; }
+    .asset-icon--document { background: #ECFDF5; color: #059669; }
+    .asset-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+    .asset-name { font-size: 13px; font-weight: 600; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .asset-meta { display: flex; align-items: center; gap: 6px; }
+    .asset-type-badge { font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 10px; background: var(--color-surface-raised); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .asset-version { font-size: 11px; color: var(--color-text-muted); }
+    .asset-notes { font-size: 12px; color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .asset-approved { font-size: 11.5px; color: var(--color-accent); font-weight: 500; }
+    .asset-link { width: 30px; height: 30px; min-width: 30px; display: flex; align-items: center; justify-content: center; border-radius: 6px; color: var(--color-text-muted); text-decoration: none; transition: background 0.12s, color 0.12s; }
+    .asset-link:hover { background: #EFF6FF; color: #3B82F6; }
+
+    .content-list { display: flex; flex-direction: column; gap: 8px; }
+    .content-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); transition: border-color 0.15s; }
+    .content-row:hover { border-color: var(--color-border-strong); }
+    .content-row-left { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    .content-title { font-size: 13.5px; font-weight: 600; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .content-slug { font-size: 11.5px; color: var(--color-text-muted); font-family: var(--font-mono, monospace); }
+    .content-meta-title { font-size: 11.5px; color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .content-row-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .content-words { font-size: 12px; color: var(--color-text-muted); white-space: nowrap; }
+    .content-status-badge { font-size: 10.5px; font-weight: 700; padding: 2px 9px; border-radius: 10px; background: #ECFDF5; color: #059669; letter-spacing: 0.04em; text-transform: uppercase; }
   `]
 })
 export class DevelopmentTab implements OnInit {
@@ -475,6 +607,7 @@ export class DevelopmentTab implements OnInit {
   private route           = inject(ActivatedRoute);
   private projectService  = inject(ProjectService);
   private state           = inject(ProjectStateService);
+  private notifService    = inject(NotificationService);
 
   private get projectId(): string {
     return this.route.parent?.snapshot.paramMap.get('id') ?? '';
@@ -483,10 +616,20 @@ export class DevelopmentTab implements OnInit {
   protected activeTab = signal<TabId>('brief');
 
   protected tabs = [
-    { id: 'brief'  as TabId, label: 'Dev Brief',  badge: () => null },
-    { id: 'kanban' as TabId, label: 'Kanban',      badge: () => this.tasks().length > 0 ? this.tasks().length : null },
-    { id: 'gate'   as TabId, label: 'Soft Gate',   badge: () => null },
+    { id: 'brief'   as TabId, label: 'Dev Brief',     badge: () => null as number | null },
+    { id: 'kanban'  as TabId, label: 'Kanban',         badge: () => this.tasks().length > 0 ? this.tasks().length : null },
+    { id: 'assets'  as TabId, label: 'Design Assets',  badge: () => this.approvedAssets().length > 0 ? this.approvedAssets().length : null },
+    { id: 'content' as TabId, label: 'Content',        badge: () => this.approvedPages().length > 0 ? this.approvedPages().length : null },
+    { id: 'gate'    as TabId, label: 'Soft Gate',      badge: () => null as number | null },
   ];
+
+  protected approvedAssets = computed(() =>
+    (this.state.project()?.design?.assets ?? []).filter((a): a is DesignAsset => !!a.approvedAt)
+  );
+
+  protected approvedPages = computed(() =>
+    (this.state.project()?.content?.pages ?? []).filter((p): p is ContentPage => p.status === 'APPROVED')
+  );
 
   protected columns = COLUMNS;
 
@@ -530,6 +673,21 @@ export class DevelopmentTab implements OnInit {
         assigneeName: t.assigneeName ?? '', dueDate: t.dueDate?.slice(0, 10) ?? '',
       })));
     }
+  }
+
+  protected assetIcon(type: AssetType): string {
+    const icons: Record<AssetType, string> = {
+      IMAGE:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`,
+      VIDEO:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>`,
+      FONT:     `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>`,
+      DOCUMENT: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
+      OTHER:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>`,
+    };
+    return icons[type] ?? icons.OTHER;
+  }
+
+  protected formatDate(iso: string): string {
+    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
   protected tasksByStatus(status: TaskStatus) {
@@ -595,6 +753,15 @@ export class DevelopmentTab implements OnInit {
         this.gateSuccess.set(true);
         this.projectService.getProject(this.projectId)
           .subscribe(p => this.state.setProject(p));
+        const name = this.state.project()?.name ?? 'Project';
+        this.notifService.add({
+          type: 'stage_unlocked',
+          title: 'Development gate approved',
+          body: `${name} — Marketing is now unlocked`,
+          projectId: this.projectId,
+          projectName: name,
+          route: `/app/projects/${this.projectId}/analytics`,
+        });
       },
       error: (err) => {
         this.gateError.set(err?.error?.error ?? 'Gate approval failed.');

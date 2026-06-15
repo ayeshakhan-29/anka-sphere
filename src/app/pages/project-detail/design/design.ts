@@ -4,6 +4,8 @@ import { ActivatedRoute } from '@angular/router';
 import { Badge } from '../../../ui';
 import { ProjectService } from '../../../services/project.service';
 import { ProjectStateService } from '../../../services/project-state.service';
+import { AuthService } from '../../../services/auth.service';
+import { NotificationService } from '../../../services/notification.service';
 
 type TabId = 'brief' | 'kanban' | 'assets' | 'gate';
 type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE';
@@ -583,6 +585,9 @@ export class DesignModule implements OnInit {
   private route = inject(ActivatedRoute);
   private projectService = inject(ProjectService);
   private state = inject(ProjectStateService);
+  private auth  = inject(AuthService);
+  private notifService = inject(NotificationService);
+  protected canApprove = computed(() => this.auth.canApproveStage('DESIGN'));
 
   private get projectId(): string {
     return this.route.parent?.snapshot.paramMap.get('id') ?? '';
@@ -742,6 +747,15 @@ export class DesignModule implements OnInit {
         this.gateSubmitting.set(false);
         this.gateSuccess.set(true);
         this.projectService.getProject(this.projectId).subscribe(p => this.state.setProject(p));
+        const name = this.state.project()?.name ?? 'Project';
+        this.notifService.add({
+          type: 'stage_unlocked',
+          title: 'Design gate approved',
+          body: `${name} — Development is now unlocked`,
+          projectId: this.projectId,
+          projectName: name,
+          route: `/app/projects/${this.projectId}/development`,
+        });
       },
       error: (err) => {
         this.gateError.set(err?.error?.error ?? 'Gate approval failed.');

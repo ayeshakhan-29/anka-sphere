@@ -3,3 +3,4 @@ export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 export { Badge } from './badge';
 export { Input, Label, Separator } from './input';
 export { Avatar } from './avatar';
+export { Toast } from './toast';
