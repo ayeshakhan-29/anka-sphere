@@ -34,100 +34,6 @@ interface DesignProject {
   notes?: string;
 }
 
-const MOCK_PROJECTS: DesignProject[] = [
-  {
-    id: '1',
-    name: 'Brand Refresh & Website',
-    client: 'Lumina Studios',
-    clientInitials: 'LS',
-    assignedTo: ['SM', 'AK'],
-    gateStatus: 'in-progress',
-    briefDone: true,
-    styleGuideDone: true,
-    figmaLinked: true,
-    tasks: { todo: 3, inProgress: 2, inReview: 1, done: 6 },
-    assetsCount: 12,
-    assetsApproved: 8,
-    daysInStage: 14,
-    targetDays: 21,
-    lastUpdated: 'Today',
-    priority: 'high',
-  },
-  {
-    id: '15',
-    name: 'E-Commerce UI Kit',
-    client: 'Verdant Market',
-    clientInitials: 'VM',
-    assignedTo: ['SM'],
-    gateStatus: 'in-review',
-    briefDone: true,
-    styleGuideDone: true,
-    figmaLinked: true,
-    tasks: { todo: 0, inProgress: 1, inReview: 4, done: 10 },
-    assetsCount: 22,
-    assetsApproved: 18,
-    daysInStage: 18,
-    targetDays: 21,
-    lastUpdated: 'Yesterday',
-    priority: 'high',
-    notes: '4 assets pending client feedback.',
-  },
-  {
-    id: '16',
-    name: 'Healthcare Brand Identity',
-    client: 'MedCore Solutions',
-    clientInitials: 'MC',
-    assignedTo: ['AK', 'SM'],
-    gateStatus: 'pending-gate',
-    briefDone: true,
-    styleGuideDone: true,
-    figmaLinked: true,
-    tasks: { todo: 0, inProgress: 0, inReview: 0, done: 14 },
-    assetsCount: 18,
-    assetsApproved: 18,
-    daysInStage: 20,
-    targetDays: 21,
-    lastUpdated: '2 days ago',
-    priority: 'medium',
-    notes: 'All tasks done — Soft Gate ready to proceed.',
-  },
-  {
-    id: '17',
-    name: 'Mobile App Screens',
-    client: 'Stackflow Inc.',
-    clientInitials: 'SI',
-    assignedTo: ['SM'],
-    gateStatus: 'not-started',
-    briefDone: false,
-    styleGuideDone: false,
-    figmaLinked: false,
-    tasks: { todo: 0, inProgress: 0, inReview: 0, done: 0 },
-    assetsCount: 0,
-    assetsApproved: 0,
-    daysInStage: 2,
-    targetDays: 21,
-    lastUpdated: 'Today',
-    priority: 'low',
-  },
-  {
-    id: '18',
-    name: 'Luxury Real Estate Visuals',
-    client: 'Meridian Group',
-    clientInitials: 'MG',
-    assignedTo: ['AK'],
-    gateStatus: 'approved',
-    briefDone: true,
-    styleGuideDone: true,
-    figmaLinked: true,
-    tasks: { todo: 0, inProgress: 0, inReview: 0, done: 9 },
-    assetsCount: 15,
-    assetsApproved: 15,
-    daysInStage: 19,
-    targetDays: 21,
-    lastUpdated: '3 days ago',
-    priority: 'medium',
-  },
-];
 
 @Component({
   selector: 'app-design-dept',
@@ -889,8 +795,14 @@ export class DesignDept implements OnInit {
   }
 
   protected approveGate(project: DesignProject) {
-    this.projects.update(list =>
-      list.map(p => p.id === project.id ? { ...p, gateStatus: 'approved' as DesignGateStatus } : p)
-    );
+    this.projectService.completeDesign(project.id).subscribe({
+      next: () => {
+        this.projects.update(list =>
+          list.map(p => p.id === project.id ? { ...p, gateStatus: 'approved' as DesignGateStatus } : p)
+        );
+        this.notifService.toast(`Design gate approved for "${project.name}"`, 'success');
+      },
+      error: (err) => this.notifService.toast(err?.error?.error ?? 'Gate approval failed', 'warning'),
+    });
   }
 }

@@ -32,80 +32,6 @@ interface ProfilingProject {
   notes?: string;
 }
 
-const MOCK_PROJECTS: ProfilingProject[] = [
-  {
-    id: '5',
-    name: 'Social Media Launch',
-    client: 'Bloom Skincare',
-    clientInitials: 'BS',
-    assignedTo: ['SM'],
-    gateStatus: 'in-progress',
-    sections: { brief: true, brand: true, personas: 2, competitors: 1, seo: false, timeline: 1 },
-    completionPct: 55,
-    daysInStage: 4,
-    targetDays: 7,
-    lastUpdated: 'Today',
-    priority: 'medium',
-  },
-  {
-    id: '7',
-    name: 'Fintech App Website',
-    client: 'ClearLedger',
-    clientInitials: 'CL',
-    assignedTo: ['AK', 'LT'],
-    gateStatus: 'pending-review',
-    sections: { brief: true, brand: true, personas: 3, competitors: 4, seo: true, timeline: 5 },
-    completionPct: 100,
-    daysInStage: 8,
-    targetDays: 10,
-    lastUpdated: 'Yesterday',
-    priority: 'high',
-    notes: 'Client is waiting — please expedite gate approval.',
-  },
-  {
-    id: '8',
-    name: 'Luxury Real Estate Portal',
-    client: 'Meridian Group',
-    clientInitials: 'MG',
-    assignedTo: ['AK'],
-    gateStatus: 'overdue',
-    sections: { brief: true, brand: false, personas: 0, competitors: 2, seo: false, timeline: 0 },
-    completionPct: 28,
-    daysInStage: 14,
-    targetDays: 7,
-    lastUpdated: '5 days ago',
-    priority: 'high',
-    notes: 'Waiting on brand guidelines from client.',
-  },
-  {
-    id: '9',
-    name: 'SaaS Dashboard Redesign',
-    client: 'Stackflow Inc.',
-    clientInitials: 'SI',
-    assignedTo: ['SM', 'AK'],
-    gateStatus: 'not-started',
-    sections: { brief: false, brand: false, personas: 0, competitors: 0, seo: false, timeline: 0 },
-    completionPct: 0,
-    daysInStage: 1,
-    targetDays: 7,
-    lastUpdated: 'Today',
-    priority: 'low',
-  },
-  {
-    id: '10',
-    name: 'Corporate Rebrand',
-    client: 'Nexus Holdings',
-    clientInitials: 'NH',
-    assignedTo: ['JD', 'AK'],
-    gateStatus: 'approved',
-    sections: { brief: true, brand: true, personas: 2, competitors: 3, seo: true, timeline: 4 },
-    completionPct: 100,
-    daysInStage: 6,
-    targetDays: 7,
-    lastUpdated: '2 days ago',
-    priority: 'medium',
-  },
-];
 
 @Component({
   selector: 'app-profiling-dept',
@@ -898,9 +824,15 @@ export class ProfilingDept implements OnInit {
   }
 
   protected approveGate(project: ProfilingProject) {
-    this.projects.update(list =>
-      list.map(p => p.id === project.id ? { ...p, gateStatus: 'approved' as GateStatus } : p)
-    );
+    this.projectService.completeProfiling(project.id).subscribe({
+      next: () => {
+        this.projects.update(list =>
+          list.map(p => p.id === project.id ? { ...p, gateStatus: 'approved' as GateStatus } : p)
+        );
+        this.notifService.toast(`Profiling gate approved for "${project.name}"`, 'success');
+      },
+      error: (err) => this.notifService.toast(err?.error?.error ?? 'Gate approval failed', 'warning'),
+    });
   }
 
   protected nudgeClient(project: ProfilingProject) {

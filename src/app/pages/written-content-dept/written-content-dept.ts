@@ -31,109 +31,6 @@ interface ContentProject {
   notes?: string;
 }
 
-const MOCK_PROJECTS: ContentProject[] = [
-  {
-    id: '4',
-    name: 'Corporate Website',
-    client: 'Nexus Holdings',
-    clientInitials: 'NH',
-    assignedTo: ['JD', 'AK'],
-    gateStatus: 'drafting',
-    briefDone: true,
-    toneOfVoiceDone: true,
-    pages: [
-      { title: 'Home', status: 'approved', wordCount: 820 },
-      { title: 'About', status: 'in-review', wordCount: 610 },
-      { title: 'Services', status: 'draft', wordCount: 340 },
-      { title: 'Contact', status: 'draft', wordCount: 120 },
-    ],
-    totalWords: 1890,
-    daysInStage: 5,
-    targetDays: 10,
-    lastUpdated: '3 days ago',
-    priority: 'high',
-  },
-  {
-    id: '11',
-    name: 'Healthcare Platform',
-    client: 'MedCore Solutions',
-    clientInitials: 'MC',
-    assignedTo: ['SM', 'AK'],
-    gateStatus: 'pending-gate',
-    briefDone: true,
-    toneOfVoiceDone: true,
-    pages: [
-      { title: 'Home', status: 'approved', wordCount: 950 },
-      { title: 'Services', status: 'approved', wordCount: 1100 },
-      { title: 'About', status: 'approved', wordCount: 700 },
-      { title: 'Blog Post 1', status: 'approved', wordCount: 1500 },
-      { title: 'Contact', status: 'approved', wordCount: 200 },
-    ],
-    totalWords: 4450,
-    daysInStage: 9,
-    targetDays: 12,
-    lastUpdated: 'Yesterday',
-    priority: 'high',
-    notes: 'All pages approved — awaiting manager gate sign-off.',
-  },
-  {
-    id: '12',
-    name: 'Travel Agency Rebrand',
-    client: 'WanderCo',
-    clientInitials: 'WC',
-    assignedTo: ['LT'],
-    gateStatus: 'overdue',
-    briefDone: true,
-    toneOfVoiceDone: false,
-    pages: [
-      { title: 'Home', status: 'draft', wordCount: 210 },
-      { title: 'Destinations', status: 'draft', wordCount: 0 },
-    ],
-    totalWords: 210,
-    daysInStage: 16,
-    targetDays: 10,
-    lastUpdated: '6 days ago',
-    priority: 'high',
-    notes: 'Tone of Voice doc missing. No update in 6 days.',
-  },
-  {
-    id: '13',
-    name: 'Fashion E-Commerce',
-    client: 'AuraWear',
-    clientInitials: 'AW',
-    assignedTo: ['JD'],
-    gateStatus: 'in-review',
-    briefDone: true,
-    toneOfVoiceDone: true,
-    pages: [
-      { title: 'Home', status: 'approved', wordCount: 600 },
-      { title: 'Shop', status: 'in-review', wordCount: 450 },
-      { title: 'About', status: 'in-review', wordCount: 380 },
-      { title: 'Blog Post 1', status: 'revision', wordCount: 1200 },
-    ],
-    totalWords: 2630,
-    daysInStage: 7,
-    targetDays: 12,
-    lastUpdated: 'Today',
-    priority: 'medium',
-  },
-  {
-    id: '14',
-    name: 'Logistics Portal',
-    client: 'FastHaul',
-    clientInitials: 'FH',
-    assignedTo: ['AK'],
-    gateStatus: 'not-started',
-    briefDone: false,
-    toneOfVoiceDone: false,
-    pages: [],
-    totalWords: 0,
-    daysInStage: 1,
-    targetDays: 10,
-    lastUpdated: 'Today',
-    priority: 'low',
-  },
-];
 
 @Component({
   selector: 'app-written-content-dept',
@@ -892,9 +789,15 @@ export class WrittenContentDept implements OnInit {
   }
 
   protected approveGate(project: ContentProject) {
-    this.projects.update(list =>
-      list.map(p => p.id === project.id ? { ...p, gateStatus: 'approved' as ContentGateStatus } : p)
-    );
+    this.projectService.completeContent(project.id).subscribe({
+      next: () => {
+        this.projects.update(list =>
+          list.map(p => p.id === project.id ? { ...p, gateStatus: 'approved' as ContentGateStatus } : p)
+        );
+        this.notifService.toast(`Written Content gate approved for "${project.name}"`, 'success');
+      },
+      error: (err) => this.notifService.toast(err?.error?.error ?? 'Gate approval failed', 'warning'),
+    });
   }
 
   protected nudge(project: ContentProject) {
