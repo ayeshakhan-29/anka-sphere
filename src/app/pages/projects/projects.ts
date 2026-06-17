@@ -31,7 +31,7 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
       <div class="page-header">
         <div>
           <h2 class="heading">All Projects</h2>
-          <p class="subheading">{{ projects().length }} client projects</p>
+          <p class="subheading">{{ filtered().length }} of {{ projects().length }} projects</p>
         </div>
         <button class="btn-new" (click)="showModal.set(true)">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -46,8 +46,26 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
         <div class="error-banner" role="alert">{{ error() }}</div>
       }
 
-      <!-- Filter tabs -->
-      <div class="filter-tabs" role="tablist" aria-label="Filter projects">
+      <!-- Search + filters -->
+      <div class="toolbar">
+        <div class="search-wrap">
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="search-input" type="search" placeholder="Search projects or clients…" aria-label="Search projects"
+            [value]="search()" (input)="search.set($any($event.target).value)" />
+        </div>
+        <div class="stage-filters" role="group" aria-label="Filter by stage">
+          <button class="sf" [class.active]="stageFilter() === 'all'" (click)="stageFilter.set('all')">All stages</button>
+          @for (s of stageOptions; track s.value) {
+            <button class="sf" [class.active]="stageFilter() === s.value" (click)="stageFilter.set(s.value)"
+              [style.--dot]="s.color">
+              <span class="sf-dot" [style.background]="s.color" aria-hidden="true"></span>{{ s.label }}
+            </button>
+          }
+        </div>
+      </div>
+
+      <!-- Status tabs -->
+      <div class="filter-tabs" role="tablist" aria-label="Filter by status">
         @for (tab of tabs; track tab.value) {
           <button
             role="tab"
@@ -89,6 +107,21 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
               <div class="card-body">
                 <h3 class="project-name">{{ project.name }}</h3>
                 <p class="project-client">{{ project.clientName }}</p>
+                @if (project.description) {
+                  <p class="project-desc">{{ project.description }}</p>
+                }
+              </div>
+
+              <!-- Pipeline mini-progress -->
+              <div class="card-pipeline" aria-label="Pipeline progress" role="img">
+                @for (entry of project.pipeline; track entry.stage) {
+                  <div class="pip-seg"
+                    [class.pip-done]="entry.status === 'APPROVED'"
+                    [class.pip-active]="entry.status === 'IN_PROGRESS'"
+                    [style.background]="entry.status === 'APPROVED' ? stageColor(entry.stage) : entry.status === 'IN_PROGRESS' ? stageColor(entry.stage) + '66' : ''"
+                    [attr.title]="stageLabel(entry.stage) + ' — ' + entry.status">
+                  </div>
+                }
               </div>
 
               <div class="card-stage">
@@ -183,7 +216,19 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
     }
   `,
   styles: [`
-    .projects-page { max-width: 1200px; }
+    .projects-page { max-width: 1200px; display: flex; flex-direction: column; gap: 0; }
+
+    /* Toolbar */
+    .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    .search-wrap { position: relative; flex-shrink: 0; }
+    .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--color-text-muted); pointer-events: none; }
+    .search-input { height: 36px; padding: 0 12px 0 32px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 13px; color: var(--color-text); background: var(--color-surface); outline: none; width: 240px; }
+    .search-input:focus { border-color: var(--color-accent); }
+    .stage-filters { display: flex; gap: 4px; flex-wrap: wrap; }
+    .sf { display: flex; align-items: center; gap: 5px; height: 30px; padding: 0 10px; border: 1px solid var(--color-border); border-radius: 15px; font-family: var(--font-sans); font-size: 12px; font-weight: 500; color: var(--color-text-secondary); background: var(--color-surface); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+    .sf:hover { border-color: var(--color-border-strong); color: var(--color-text); }
+    .sf.active { background: var(--color-sidebar); color: #F8FAFC; border-color: var(--color-sidebar); }
+    .sf-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
     .page-header {
       display: flex;
@@ -316,6 +361,9 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
     .card-body { display: flex; flex-direction: column; gap: 2px; }
     .project-name { font-family: var(--font-display); font-size: 16px; font-weight: 400; color: var(--color-text); margin: 0; }
     .project-client { font-size: 12.5px; color: var(--color-text-secondary); margin: 0; }
+    .project-desc { font-size: 12px; color: var(--color-text-muted); margin: 4px 0 0; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .card-pipeline { display: flex; gap: 3px; height: 5px; border-radius: 4px; overflow: hidden; }
+    .pip-seg { flex: 1; border-radius: 3px; background: var(--color-surface-raised); transition: background 0.2s; }
     .card-stage { display: flex; align-items: center; gap: 7px; }
     .stage-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
     .stage-label { font-size: 12.5px; color: var(--color-text-secondary); }
@@ -452,13 +500,23 @@ export class Projects implements OnInit {
   private projectService = inject(ProjectService);
   private fb = inject(FormBuilder);
 
-  protected activeTab = signal<'all' | ProjectStatus>('all');
-  protected projects = signal<Project[]>([]);
-  protected loading = signal(true);
-  protected error = signal<string | null>(null);
-  protected showModal = signal(false);
-  protected creating = signal(false);
+  protected activeTab   = signal<'all' | ProjectStatus>('all');
+  protected stageFilter = signal<'all' | PipelineStage>('all');
+  protected search      = signal('');
+  protected projects    = signal<Project[]>([]);
+  protected loading     = signal(true);
+  protected error       = signal<string | null>(null);
+  protected showModal   = signal(false);
+  protected creating    = signal(false);
   protected createError = signal<string | null>(null);
+
+  protected stageOptions = [
+    { label: 'Profiling',       value: 'PROFILING'       as PipelineStage, color: '#3B82F6' },
+    { label: 'Written Content', value: 'WRITTEN_CONTENT' as PipelineStage, color: '#8B5CF6' },
+    { label: 'Design',          value: 'DESIGN'          as PipelineStage, color: '#EC4899' },
+    { label: 'Development',     value: 'DEVELOPMENT'     as PipelineStage, color: '#F59E0B' },
+    { label: 'Marketing',       value: 'MARKETING'       as PipelineStage, color: '#16A34A' },
+  ];
 
   protected newProjectForm = this.fb.group({
     name:        ['', Validators.required],
@@ -476,9 +534,14 @@ export class Projects implements OnInit {
   ];
 
   protected filtered = computed(() => {
-    const tab = this.activeTab();
-    if (tab === 'all') return this.projects();
-    return this.projects().filter(p => p.status === tab);
+    const tab   = this.activeTab();
+    const stage = this.stageFilter();
+    const q     = this.search().toLowerCase().trim();
+    return this.projects().filter(p =>
+      (tab   === 'all' || p.status       === tab)   &&
+      (stage === 'all' || p.currentStage === stage) &&
+      (!q || p.name.toLowerCase().includes(q) || p.clientName.toLowerCase().includes(q))
+    );
   });
 
   ngOnInit() {
