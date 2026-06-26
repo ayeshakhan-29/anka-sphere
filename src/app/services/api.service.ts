@@ -7,7 +7,18 @@ export class ApiService {
   private http = inject(HttpClient);
   private base = environment.apiUrl;
 
+  /** Headers for requests WITH a JSON body (POST, PUT, PATCH) */
   private get headers(): HttpHeaders {
+    const token = localStorage.getItem('token');
+    let h = token
+      ? new HttpHeaders({ Authorization: `Bearer ${token}` })
+      : new HttpHeaders();
+    h = h.set('Content-Type', 'application/json');
+    return h;
+  }
+
+  /** Headers for requests WITHOUT a body (GET, DELETE) — no Content-Type */
+  private get authHeaders(): HttpHeaders {
     const token = localStorage.getItem('token');
     return token
       ? new HttpHeaders({ Authorization: `Bearer ${token}` })
@@ -15,7 +26,7 @@ export class ApiService {
   }
 
   get<T>(path: string) {
-    return this.http.get<T>(`${this.base}${path}`, { headers: this.headers });
+    return this.http.get<T>(`${this.base}${path}`, { headers: this.authHeaders });
   }
 
   post<T>(path: string, body: unknown) {
@@ -31,6 +42,10 @@ export class ApiService {
   }
 
   delete<T>(path: string) {
-    return this.http.delete<T>(`${this.base}${path}`, { headers: this.headers });
+    return this.http.delete<T>(`${this.base}${path}`, {
+      headers: this.authHeaders,
+      responseType: 'text' as 'json',
+    });
   }
 }
+

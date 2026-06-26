@@ -257,7 +257,7 @@ interface DevProject {
     /* List header */
     .list-header {
       display: grid;
-      grid-template-columns: 175px 105px 155px 80px 108px 68px min-content;
+      grid-template-columns: 175px 105px 155px 80px 108px 68px max-content;
       gap: 10px;
       padding: 0 14px;
       font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
@@ -268,7 +268,7 @@ interface DevProject {
     .project-list { display: flex; flex-direction: column; gap: 6px; }
     .prow {
       display: grid;
-      grid-template-columns: 175px 105px 155px 80px 108px 68px min-content;
+      grid-template-columns: 175px 105px 155px 80px 108px 68px max-content;
       gap: 10px;
       align-items: center;
       padding: 10px 14px;
@@ -442,10 +442,10 @@ export class DevelopmentDept implements OnInit {
     const dev = p.development;
     const allTasks = dev?.tasks ?? [];
     const tasks: TaskBreakdown = {
-      todo:       allTasks.filter(t => t.status === 'TODO').length,
-      inProgress: allTasks.filter(t => t.status === 'IN_PROGRESS').length,
-      inReview:   allTasks.filter(t => t.status === 'IN_REVIEW').length,
-      done:       allTasks.filter(t => t.status === 'DONE').length,
+      todo:       allTasks.filter(t => t.status === 'SETUP').length,
+      inProgress: allTasks.filter(t => t.status === 'IN_DEVELOPMENT').length,
+      inReview:   allTasks.filter(t => t.status === 'IN_QA' || t.status === 'STAGING').length,
+      done:       allTasks.filter(t => t.status === 'LIVE' || t.status === 'MAINTENANCE').length,
     };
     const briefDone  = !!(dev?.techStack);
     const repoLinked = !!(dev?.repoUrl);

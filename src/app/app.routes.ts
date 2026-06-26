@@ -41,6 +41,7 @@ export const routes: Routes = [
       { path: 'paid',             loadComponent: () => import('./pages/paid-dept/paid-dept').then(m => m.PaidDept) },
       { path: 'seo',              loadComponent: () => import('./pages/seo-dept/seo-dept').then(m => m.SeoDept) },
       { path: 'reporting',        loadComponent: () => import('./pages/reporting/reporting-dept').then(m => m.ReportingDept) },
+      { path: 'maintenance',      loadComponent: () => import('./pages/maintenance/maintenance').then(m => m.MaintenancePage) },
     ],
   },
   { path: '**', redirectTo: '/login' },

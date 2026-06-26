@@ -223,4 +223,90 @@ export class ProjectService {
   deleteMarketingTask(projectId: string, taskId: string) {
     return this.api.delete<void>(`/projects/${projectId}/marketing/tasks/${taskId}`);
   }
+
+  // ── WP Connections ──────────────────────────────────────────────────────
+
+  getWpConnections(projectId: string) {
+    return this.api.get<any[]>(`/projects/${projectId}/development/wp-connections`);
+  }
+
+  upsertWpConnection(projectId: string, env: string, data: any) {
+    return this.api.put<any>(`/projects/${projectId}/development/wp-connections/${env}`, data);
+  }
+
+  // ── Deployment Queue ────────────────────────────────────────────────────
+
+  getDeploymentQueue(projectId: string) {
+    return this.api.get<any[]>(`/projects/${projectId}/development/queue`);
+  }
+
+  createDeploymentQueueItem(projectId: string, data: any) {
+    return this.api.post<any>(`/projects/${projectId}/development/queue`, data);
+  }
+
+  updateDeploymentQueueItem(projectId: string, itemId: string, data: any) {
+    return this.api.patch<any>(`/projects/${projectId}/development/queue/${itemId}`, data);
+  }
+
+  deleteDeploymentQueueItem(projectId: string, itemId: string) {
+    return this.api.delete<void>(`/projects/${projectId}/development/queue/${itemId}`);
+  }
+
+  syncApprovedPagesToQueue(projectId: string) {
+    return this.api.post<{ count: number; items: any[] }>(`/projects/${projectId}/development/queue/sync-approved`, {});
+  }
+
+  updateQa(projectId: string, itemId: string, data: any) {
+    return this.api.patch<any>(`/projects/${projectId}/development/queue/${itemId}/qa`, data);
+  }
+
+  deploy(projectId: string, data: any) {
+    return this.api.post<any>(`/projects/${projectId}/development/deploy`, data);
+  }
+
+  // ── Deployment Logs ─────────────────────────────────────────────────────
+
+  getDeploymentLogs(projectId: string, itemId: string) {
+    return this.api.get<any[]>(`/projects/${projectId}/development/queue/${itemId}/logs`);
+  }
+
+  // ── WP Plugins ──────────────────────────────────────────────────────────
+
+  getWpPlugins(projectId: string) {
+    return this.api.get<any[]>(`/projects/${projectId}/development/wp-plugins`);
+  }
+
+  upsertWpPlugin(projectId: string, slug: string, data: any) {
+    return this.api.put<any>(`/projects/${projectId}/development/wp-plugins/${slug}`, data);
+  }
+
+  // ── WP Themes ───────────────────────────────────────────────────────────
+
+  getWpThemes(projectId: string) {
+    return this.api.get<any[]>(`/projects/${projectId}/development/wp-themes`);
+  }
+
+  upsertWpTheme(projectId: string, slug: string, data: any) {
+    return this.api.put<any>(`/projects/${projectId}/development/wp-themes/${slug}`, data);
+  }
+
+  // ── Change Log ──────────────────────────────────────────────────────
+
+  getChangeLog(projectId: string) {
+    return this.api.get<any[]>(`/projects/${projectId}/development/changelog`);
+  }
+
+  createChangeLogEntry(projectId: string, data: any) {
+    return this.api.post<any>(`/projects/${projectId}/development/changelog`, data);
+  }
+
+  deleteChangeLogEntry(projectId: string, entryId: string) {
+    return this.api.delete<void>(`/projects/${projectId}/development/changelog/${entryId}`);
+  }
+
+  // ── Project Backup ──────────────────────────────────────────────────
+
+  triggerProjectBackup(projectId: string) {
+    return this.api.post<any>(`/projects/${projectId}/development/backup`, {});
+  }
 }

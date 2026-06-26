@@ -8,6 +8,14 @@ export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE';
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 export type AssetType = 'IMAGE' | 'VIDEO' | 'FONT' | 'DOCUMENT' | 'OTHER';
 
+export interface Maintenance {
+  id: string;
+  uptimeStatus: 'OPERATIONAL' | 'DEGRADED' | 'DOWN';
+  backupLog: string;
+  performanceNotes: string;
+  updatedAt: string;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -124,15 +132,18 @@ export interface Design {
   assets: DesignAsset[];
 }
 
+export type DevTaskStatus = 'SETUP' | 'IN_DEVELOPMENT' | 'IN_QA' | 'STAGING' | 'LIVE' | 'MAINTENANCE';
+
 export interface DevTask {
   id: string;
   title: string;
   description?: string;
-  status: TaskStatus;
+  status: DevTaskStatus;
   priority: TaskPriority;
   assigneeName?: string;
   dueDate?: string;
   sortOrder: number;
+  pageId?: string;
 }
 
 export type MarketingTaskCategory = 'CONTENT' | 'SOCIAL' | 'PAID' | 'SEO' | 'ANALYTICS' | 'OTHER';
@@ -171,6 +182,14 @@ export interface Development {
   notes?: string;
   completedAt?: string;
   tasks: DevTask[];
+
+  // Maintenance & Uptime fields
+  performanceNotes?: string;
+  backupLog?: BackupEntry[];
+  uptimeStatus?: string;
+  uptimeResponseTime?: number;
+  uptimeLastChecked?: string;
+  changeLog?: ChangeLogEntry[];
 }
 
 export interface Project {
@@ -201,4 +220,129 @@ export interface CreateProjectDto {
   description?: string;
   startDate?: string;
   targetDate?: string;
+}
+
+// ── Maintenance Models ────────────────────────────────────────────────
+
+export interface BackupEntry {
+  date: string;
+  provider: string;
+  size: string;
+  note?: string;
+}
+
+export interface ChangeLogEntry {
+  id: string;
+  projectId: string;
+  pageName: string;
+  description: string;
+  changedBy: string;
+  changedAt: string;
+}
+
+// ── WP Deployment Models ──────────────────────────────────────────────
+
+export type WpEnv = 'DEV' | 'STAGING' | 'PRODUCTION';
+export type QueueItemStatus = 'QUEUED' | 'IN_PROGRESS' | 'IN_QA' | 'STAGING_DONE' | 'LIVE_DONE' | 'FAILED';
+export type QaStatus = 'NOT_STARTED' | 'PASS' | 'FAIL';
+export type ContentKind = 'PAGE' | 'POST';
+export type WpConnectionStatus = 'ACTIVE' | 'INACTIVE';
+
+export interface WpConnection {
+  id: string;
+  projectId: string;
+  env: WpEnv;
+  siteUrl: string;
+  wpUsername: string;
+  status: WpConnectionStatus;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WpConnectionUpsert {
+  siteUrl: string;
+  wpUsername: string;
+  wpAppPassword?: string;
+  status?: WpConnectionStatus;
+  notes?: string;
+}
+
+export interface DeploymentQueueItem {
+  id: string;
+  projectId: string;
+  contentKind: ContentKind;
+  pageId?: string;
+  postId?: string;
+  title: string;
+  slug?: string;
+  status: QueueItemStatus;
+  qaStatus: QaStatus;
+  qaNotes?: string;
+  qaChecklist?: Record<string, boolean>;
+  targetEnv: WpEnv;
+  wpPostId?: number;
+  wpUrl?: string;
+  errorMessage?: string;
+  deployedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  logs?: DeploymentLog[];
+}
+
+export interface DeploymentLog {
+  id: string;
+  queueItemId: string;
+  env: WpEnv;
+  status: 'SUCCESS' | 'ERROR';
+  requestBody?: unknown;
+  responseBody?: unknown;
+  errorMessage?: string;
+  durationMs?: number;
+  pushedBy?: string;
+  createdAt: string;
+}
+
+export interface WPPlugin {
+  id: string;
+  projectId: string;
+  name: string;
+  slug: string;
+  version?: string;
+  status: 'ACTIVE' | 'INACTIVE';
+  description?: string;
+  lastUpdatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WPPluginUpsert {
+  name: string;
+  slug: string;
+  version?: string;
+  status?: 'ACTIVE' | 'INACTIVE';
+  description?: string;
+  lastUpdatedAt?: string;
+}
+
+export interface WPTheme {
+  id: string;
+  projectId: string;
+  name: string;
+  slug: string;
+  version?: string;
+  status: 'ACTIVE' | 'INACTIVE';
+  description?: string;
+  lastUpdatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WPThemeUpsert {
+  name: string;
+  slug: string;
+  version?: string;
+  status?: 'ACTIVE' | 'INACTIVE';
+  description?: string;
+  lastUpdatedAt?: string;
 }

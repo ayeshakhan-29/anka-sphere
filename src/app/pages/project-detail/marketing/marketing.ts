@@ -87,7 +87,7 @@ const CAT_COLORS: Record<string, string> = {
               <button
                 class="cat-btn"
                 [class.active]="catFilter() === cat"
-                [style.--cat-color]="catFilter() === cat ? (CAT_COLORS[cat] ?? '#6366F1') : 'transparent'"
+                [style.--cat-color]="catFilter() === cat ? (CAT_COLORS[cat] || '#6366F1') : 'transparent'"
                 (click)="catFilter.set(cat)"
               >{{ cat === 'ALL' ? 'All' : cat }}</button>
             }

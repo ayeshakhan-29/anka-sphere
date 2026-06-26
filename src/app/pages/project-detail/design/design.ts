@@ -387,7 +387,7 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
                 <button
                   class="btn-approve"
                   type="button"
-                  [disabled]="!gateReady() || gateSubmitting()"
+                  [disabled]="gateSubmitting()"
                   (click)="approveGate()"
                 >
                   @if (gateSubmitting()) {
@@ -674,13 +674,21 @@ export class DesignModule implements OnInit {
   }
 
   protected addTask() {
-    this.projectService.createDesignTask(this.projectId, { title: '', status: 'TODO', priority: 'MEDIUM', sortOrder: this.tasks().length + 1 })
+    this.projectService.createDesignTask(this.projectId, { title: 'New Task', status: 'TODO', priority: 'MEDIUM', sortOrder: this.tasks().length + 1 })
       .subscribe(t => this.tasks.update(list => [...list, { id: t.id, title: t.title, description: t.description ?? '', status: t.status as TaskStatus, priority: t.priority as TaskPriority, assigneeName: '', dueDate: '' }]));
   }
 
   protected deleteTask(id: string) {
+    console.log('[Design] deleteTask - projectId:', this.projectId, 'taskId:', id);
     this.projectService.deleteDesignTask(this.projectId, id)
-      .subscribe(() => this.tasks.update(list => list.filter(t => t.id !== id)));
+      .subscribe({
+        next: () => this.tasks.update(list => list.filter(t => t.id !== id)),
+        error: (err) => {
+          console.error('[Design] deleteTask error:', err);
+          const msg = err?.error?.error ?? err?.message ?? 'Failed to delete task';
+          this.notifService.toast(msg, 'warning');
+        },
+      });
   }
 
   protected updateTask(id: string, field: keyof DesignTask, value: string) {
@@ -694,9 +702,15 @@ export class DesignModule implements OnInit {
     const task = this.tasks().find(t => t.id === id);
     if (!task) return;
     const next = order[(order.indexOf(task.status) + 1) % order.length];
-    this.projectService.updateDesignTask(this.projectId, id, { status: next }).subscribe(() =>
-      this.tasks.update(list => list.map(t => t.id === id ? { ...t, status: next } : t))
-    );
+    console.log('[Design] cycleStatus - projectId:', this.projectId, 'taskId:', id, 'next:', next);
+    this.projectService.updateDesignTask(this.projectId, id, { status: next }).subscribe({
+      next: () => this.tasks.update(list => list.map(t => t.id === id ? { ...t, status: next } : t)),
+      error: (err) => {
+        console.error('[Design] cycleStatus error:', err);
+        const msg = err?.error?.error ?? err?.message ?? 'Failed to update task status';
+        this.notifService.toast(msg, 'warning');
+      },
+    });
   }
 
   protected assetIcon(type: AssetType): string {

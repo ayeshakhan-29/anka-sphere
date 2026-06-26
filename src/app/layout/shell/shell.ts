@@ -5,6 +5,7 @@ import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { NotificationService } from '../../services/notification.service';
 import { Toast } from '../../ui';
+import { ThemeService } from '../../services/theme.service';
 
 interface NavItem {
   label: string;
@@ -190,6 +191,7 @@ interface NavGroup {
                 </div>
               }
             </div>
+            <button class="icon-btn" (click)="themeService.toggle()" aria-label="Toggle theme">{{ themeService.isDark() ? '🌙' : '☀️' }}</button>
           </div>
         </header>
 
@@ -425,6 +427,7 @@ interface NavGroup {
       position: relative;
     }
     .icon-btn {
+      font-size: 1.2rem;
       position: relative;
       width: 36px;
       height: 36px;
@@ -620,6 +623,7 @@ interface NavGroup {
   `]
 })
 export class Shell implements OnInit, OnDestroy {
+  protected themeService = inject(ThemeService);
   @ViewChild('pageContent') private pageContent!: ElementRef<HTMLElement>;
 
   protected sidebarCollapsed = signal(false);
@@ -639,6 +643,7 @@ export class Shell implements OnInit, OnDestroy {
     if (url.includes('paid')) return 'Paid Marketing';
     if (url.includes('seo')) return 'SEO';
     if (url.includes('reporting')) return 'Reporting';
+    if (url.includes('maintenance')) return 'Maintenance';
     return 'Dashboard';
   });
 
@@ -722,6 +727,11 @@ export class Shell implements OnInit, OnDestroy {
           route: '/app/reporting',
           icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>`
         },
+        {
+          label: 'Maintenance',
+          route: '/app/maintenance',
+          icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`
+        },
       ]
     }
   ];
@@ -741,7 +751,7 @@ export class Shell implements OnInit, OnDestroy {
         const el = this.pageContent?.nativeElement;
         if (!el) return;
         const isTopLevel = ['projects', 'profiling', 'written-content', 'design', 'development',
-          'analytics', 'content-marketing', 'social', 'paid', 'seo', 'reporting']
+          'analytics', 'content-marketing', 'social', 'paid', 'seo', 'reporting', 'maintenance']
           .some(p => event.urlAfterRedirects === `/app/${p}`);
         el.scrollTop = isTopLevel ? 0 : this.savedScroll;
       }
