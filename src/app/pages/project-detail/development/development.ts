@@ -638,12 +638,19 @@ const QUEUE_STATUS_ORDER: QueueItemStatus[] = ['QUEUED', 'IN_PROGRESS', 'IN_QA',
                     </div>
                   }
                 </div>
-                <button class="btn-approve" type="button" [disabled]="!gateReady() || gateSubmitting()" (click)="approveGate()">
-                  @if (gateSubmitting()) { <span class="spinner" aria-hidden="true"></span> Approving… }
-                  @else { Approve Development & Unlock Marketing }
-                </button>
-                @if (gateError()) { <p class="gate-error" role="alert">{{ gateError() }}</p> }
-                @if (gateSuccess()) { <p class="gate-success" role="status">Marketing stage unlocked successfully.</p> }
+                @if (canApprove()) {
+                  <button class="btn-approve" type="button" [disabled]="!gateReady() || gateSubmitting()" (click)="approveGate()">
+                    @if (gateSubmitting()) { <span class="spinner" aria-hidden="true"></span> Approving… }
+                    @else { Approve Development & Unlock Marketing }
+                  </button>
+                  @if (gateError()) { <p class="gate-error" role="alert">{{ gateError() }}</p> }
+                  @if (gateSuccess()) { <p class="gate-success" role="status">Marketing stage unlocked successfully.</p> }
+                } @else {
+                  <div class="gate-no-permission" role="status">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    You don't have permission to approve this gate.
+                  </div>
+                }
               </div>
             </div>
           </section>
@@ -1113,6 +1120,12 @@ const QUEUE_STATUS_ORDER: QueueItemStatus[] = ['QUEUED', 'IN_PROGRESS', 'IN_QA',
     .btn-approve:hover:not(:disabled) { background: #2563EB; }
     .btn-approve:disabled { opacity: 0.5; cursor: not-allowed; }
     .gate-error { font-size: 12.5px; color: var(--color-destructive); margin: 0; }
+    .gate-no-permission {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px; border-radius: var(--radius-md);
+      background: var(--color-surface-raised); border: 1px solid var(--color-border);
+      font-size: 13px; color: var(--color-text-muted);
+    }
     .gate-success { font-size: 12.5px; color: var(--color-accent); font-weight: 500; margin: 0; }
     .spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; }
 
@@ -1342,6 +1355,7 @@ export class DevelopmentTab implements OnInit {
   private state           = inject(ProjectStateService);
   private maintenanceService = inject(MaintenanceService);
   protected notifService    = inject(NotificationService);
+  private auth            = inject(AuthService);
 
   private get projectId(): string {
     return this.route.parent?.snapshot.paramMap.get('id') ?? '';
@@ -1404,6 +1418,7 @@ export class DevelopmentTab implements OnInit {
   protected gateSubmitting = signal(false);
   protected gateError    = signal<string | null>(null);
   protected gateSuccess  = signal(false);
+  protected canApprove   = computed(() => this.auth.canApproveStage('DEVELOPMENT'));
 
   // WP Connections
   protected connections = signal<WpConnection[]>([]);

@@ -5,8 +5,9 @@ import { Badge } from '../../../ui';
 import { ProjectService } from '../../../services/project.service';
 import { ProjectStateService } from '../../../services/project-state.service';
 import { NotificationService } from '../../../services/notification.service';
+import { AuthService } from '../../../services/auth.service';
 
-type TabId = 'brief' | 'brand' | 'personas' | 'competitors' | 'seo' | 'timeline';
+type TabId = 'brief' | 'brand' | 'personas' | 'competitors' | 'seo' | 'timeline' | 'gate';
 
 interface Persona {
   id: string;
@@ -255,6 +256,94 @@ interface Milestone {
             </div>
             <div class="form-actions">
               <button class="btn-save" type="button" (click)="saveSeo()">Save SEO Foundation</button>
+            </div>
+          </section>
+        }
+
+        <!-- Gate Approval -->
+        @if (activeTab() === 'gate') {
+          <section aria-label="Gate Approval">
+            <div class="gate-wrap">
+              <div class="gate-info">
+                <div class="hard-gate-banner">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  <div>
+                    <p class="banner-title">Hard Gate</p>
+                    <p class="banner-desc">All required sections (Client Brief, Brand Inputs, SEO Foundation) must be completed before this gate can be approved. Approving will unlock the Written Content stage.</p>
+                  </div>
+                </div>
+
+                <p class="checklist-title">Requirements</p>
+                <ul class="gate-checklist">
+                  <li class="gate-item" [class.done]="briefForm.valid">
+                    <span class="item-check" [class.checked]="briefForm.valid" aria-hidden="true">
+                      @if (briefForm.valid) {
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                      }
+                    </span>
+                    Client Brief filled
+                  </li>
+                  <li class="gate-item" [class.done]="brandForm.valid">
+                    <span class="item-check" [class.checked]="brandForm.valid" aria-hidden="true">
+                      @if (brandForm.valid) {
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                      }
+                    </span>
+                    Brand Inputs filled
+                  </li>
+                  <li class="gate-item" [class.done]="seoForm.valid">
+                    <span class="item-check" [class.checked]="seoForm.valid" aria-hidden="true">
+                      @if (seoForm.valid) {
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                      }
+                    </span>
+                    SEO Foundation filled
+                  </li>
+                </ul>
+              </div>
+
+              <div class="gate-action">
+                <div class="gate-status-card" [class.ready]="profilingComplete()">
+                  @if (profilingComplete()) {
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    <div>
+                      <p class="gate-card-title">Ready to approve</p>
+                      <p class="gate-card-desc">All required sections are complete. Click below to pass the Hard Gate and unlock Written Content.</p>
+                    </div>
+                  } @else {
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <div>
+                      <p class="gate-card-title">Not yet ready</p>
+                      <p class="gate-card-desc">Complete all required sections before approving.</p>
+                    </div>
+                  }
+                </div>
+
+                @if (canApprove()) {
+                  <button
+                    class="btn-approve"
+                    type="button"
+                    [disabled]="!profilingComplete() || gateLoading()"
+                    (click)="completeGate()"
+                  >
+                    @if (gateLoading()) {
+                      <span class="spinner" aria-hidden="true"></span>
+                      Approving…
+                    } @else {
+                      Approve & Unlock Written Content
+                    }
+                  </button>
+
+                  @if (gateError()) {
+                    <p class="gate-error" role="alert">{{ gateError() }}</p>
+                  }
+                } @else {
+                  <div class="gate-no-permission" role="status">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    You don't have permission to approve this gate.
+                  </div>
+                }
+              </div>
             </div>
           </section>
         }
@@ -652,6 +741,67 @@ interface Milestone {
     .tl-fill { height: 100%; background: var(--color-accent); border-radius: 10px; transition: width 0.3s ease; }
 
     .empty-hint { font-size: 13px; color: var(--color-text-muted); padding: 12px 0; }
+
+    /* Gate tab */
+    .gate-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+    @media (max-width: 760px) { .gate-wrap { grid-template-columns: 1fr; } }
+
+    .hard-gate-banner {
+      display: flex; gap: 14px; align-items: flex-start;
+      background: #FEF2F2; border: 1px solid #FECACA; border-radius: var(--radius-md);
+      padding: 16px 18px; margin-bottom: 20px; color: #DC2626;
+    }
+    .banner-title { font-size: 13px; font-weight: 600; margin: 0 0 3px; }
+    .banner-desc  { font-size: 12.5px; color: var(--color-text-secondary); margin: 0; line-height: 1.5; }
+
+    .checklist-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-muted); margin: 0 0 10px; }
+    .gate-checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .gate-item {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 13.5px; color: var(--color-text-secondary);
+      padding: 8px 12px; border-radius: var(--radius-md);
+      background: var(--color-surface); border: 1px solid var(--color-border);
+      transition: border-color 0.2s;
+    }
+    .gate-item.done { color: var(--color-text); border-color: var(--color-success); }
+    .item-check {
+      width: 20px; height: 20px; min-width: 20px; border-radius: 50%;
+      border: 2px solid var(--color-border-strong); background: var(--color-surface);
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.2s, background 0.2s, color 0.2s;
+    }
+    .item-check.checked { background: var(--color-success); border-color: var(--color-success); color: #fff; }
+
+    .gate-status-card {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 14px 16px; border-radius: var(--radius-md);
+      background: var(--color-surface-raised); border: 1px solid var(--color-border);
+      color: var(--color-text-muted); margin-bottom: 16px;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .gate-status-card.ready { border-color: var(--color-success); color: var(--color-success); }
+    .gate-card-title { font-size: 13px; font-weight: 600; margin: 0 0 2px; color: inherit; }
+    .gate-card-desc  { font-size: 12.5px; color: var(--color-text-secondary); margin: 0; line-height: 1.5; }
+
+    .btn-approve {
+      width: 100%; padding: 11px 18px;
+      background: var(--color-accent); color: #fff;
+      border: none; border-radius: var(--radius-md);
+      font-family: var(--font-sans); font-size: 13.5px; font-weight: 500;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: opacity 0.15s;
+    }
+    .btn-approve:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-approve:not(:disabled):hover { opacity: 0.88; }
+
+    .gate-error { font-size: 12.5px; color: var(--color-destructive); margin: 10px 0 0; }
+
+    .gate-no-permission {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px; border-radius: var(--radius-md);
+      background: var(--color-surface-raised); border: 1px solid var(--color-border);
+      font-size: 13px; color: var(--color-text-muted);
+    }
   `]
 })
 export class Profiling implements OnInit {
@@ -660,6 +810,9 @@ export class Profiling implements OnInit {
   private projectService = inject(ProjectService);
   private state = inject(ProjectStateService);
   private notifService = inject(NotificationService);
+  private auth         = inject(AuthService);
+
+  protected canApprove = computed(() => this.auth.canApproveStage('PROFILING'));
 
   private get projectId(): string {
     return this.route.parent?.snapshot.paramMap.get('id') ?? '';
@@ -679,6 +832,7 @@ export class Profiling implements OnInit {
     { id: 'competitors', label: 'Competitors',        required: false },
     { id: 'seo',         label: 'SEO Foundation',     required: true },
     { id: 'timeline',    label: 'Timeline',           required: false },
+    { id: 'gate',        label: 'Gate Approval',      required: false },
   ];
 
   protected briefForm = this.fb.group({

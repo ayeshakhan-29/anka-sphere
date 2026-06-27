@@ -2,6 +2,7 @@ import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Badge } from '../../ui';
 import { ProjectService } from '../../services/project.service';
+import { NotificationService } from '../../services/notification.service';
 import { Project } from '../../models/project.models';
 
 type DevGateStatus = 'not-started' | 'in-progress' | 'in-review' | 'pending-gate' | 'approved';
@@ -343,6 +344,7 @@ interface DevProject {
 })
 export class DevelopmentDept implements OnInit {
   private projectService = inject(ProjectService);
+  private notifService   = inject(NotificationService);
 
   protected search       = signal('');
   protected activeFilter = signal<'all' | DevGateStatus>('all');
@@ -503,8 +505,14 @@ export class DevelopmentDept implements OnInit {
   }
 
   protected approveGate(project: DevProject) {
-    this.projects.update(list =>
-      list.map(p => p.id === project.id ? { ...p, gateStatus: 'approved' as DevGateStatus } : p)
-    );
+    this.projectService.completeDevelopment(project.id).subscribe({
+      next: () => {
+        this.projects.update(list =>
+          list.map(p => p.id === project.id ? { ...p, gateStatus: 'approved' as DevGateStatus } : p)
+        );
+        this.notifService.toast(`Development gate approved for "${project.name}"`, 'success');
+      },
+      error: (err) => this.notifService.toast(err?.error?.error ?? 'Gate approval failed', 'warning'),
+    });
   }
 }

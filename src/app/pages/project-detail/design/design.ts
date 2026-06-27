@@ -384,25 +384,32 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
                   }
                 </div>
 
-                <button
-                  class="btn-approve"
-                  type="button"
-                  [disabled]="gateSubmitting()"
-                  (click)="approveGate()"
-                >
-                  @if (gateSubmitting()) {
-                    <span class="spinner" aria-hidden="true"></span>
-                    Approving…
-                  } @else {
-                    Approve Design & Unlock Development
-                  }
-                </button>
+                @if (canApprove()) {
+                  <button
+                    class="btn-approve"
+                    type="button"
+                    [disabled]="!gateReady() || gateSubmitting()"
+                    (click)="approveGate()"
+                  >
+                    @if (gateSubmitting()) {
+                      <span class="spinner" aria-hidden="true"></span>
+                      Approving…
+                    } @else {
+                      Approve Design & Unlock Development
+                    }
+                  </button>
 
-                @if (gateError()) {
-                  <p class="gate-error" role="alert">{{ gateError() }}</p>
-                }
-                @if (gateSuccess()) {
-                  <p class="gate-success" role="status">Development stage unlocked successfully.</p>
+                  @if (gateError()) {
+                    <p class="gate-error" role="alert">{{ gateError() }}</p>
+                  }
+                  @if (gateSuccess()) {
+                    <p class="gate-success" role="status">Development stage unlocked successfully.</p>
+                  }
+                } @else {
+                  <div class="gate-no-permission" role="status">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    You don't have permission to approve this gate.
+                  </div>
                 }
               </div>
 
@@ -574,6 +581,12 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
     .btn-approve:hover:not(:disabled) { background: var(--color-accent-hover); }
     .btn-approve:disabled { opacity: 0.5; cursor: not-allowed; }
     .gate-error { font-size: 12.5px; color: var(--color-destructive); margin: 0; }
+    .gate-no-permission {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px; border-radius: var(--radius-md);
+      background: var(--color-surface-raised); border: 1px solid var(--color-border);
+      font-size: 13px; color: var(--color-text-muted);
+    }
     .gate-success { font-size: 12.5px; color: var(--color-accent); font-weight: 500; margin: 0; }
     .spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
