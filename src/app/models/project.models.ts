@@ -70,10 +70,21 @@ export interface ProjectProfiling {
   industry?: string;
   about?: string;
   objectives?: string;
+  scope?: string;
+  budget?: string;
+  priority?: string;
   brandVoice?: string;
+  tagline?: string;
+  brandColours?: string;
+  typography?: string;
+  brandRefs?: string;
+  brandDislikes?: string;
   toneOfVoice?: string;
   primaryKeywords?: string;
   secondaryKeywords?: string;
+  existingDomain?: string;
+  localSeo?: string;
+  seoNotes?: string;
   completedAt?: string;
   personas: Persona[];
   competitors: Competitor[];
@@ -86,6 +97,8 @@ export interface ContentPage {
   body?: string;
   metaTitle?: string;
   metaDescription?: string;
+  seoTitle?: string;
+  seoDescription?: string;
   status: PageStatus;
   wordCount?: number;
   sortOrder: number;
@@ -190,6 +203,8 @@ export interface Development {
   uptimeResponseTime?: number;
   uptimeLastChecked?: string;
   changeLog?: ChangeLogEntry[];
+  qaTemplate?: QaTemplateItem[];
+  maintenanceRequests?: MaintenanceRequest[];
 }
 
 export interface Project {
@@ -240,6 +255,22 @@ export interface ChangeLogEntry {
   changedAt: string;
 }
 
+export interface QaTemplateItem {
+  id: string;
+  label: string;
+}
+
+export interface MaintenanceRequest {
+  id: string;
+  title: string;
+  description: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH';
+  target?: string;
+  requestedBy?: string;
+  status: 'OPEN' | 'IN_PROGRESS' | 'DONE';
+  createdAt: string;
+}
+
 // ── WP Deployment Models ──────────────────────────────────────────────
 
 export type WpEnv = 'DEV' | 'STAGING' | 'PRODUCTION';
@@ -255,6 +286,8 @@ export interface WpConnection {
   siteUrl: string;
   wpUsername: string;
   status: WpConnectionStatus;
+  connectionOk?: boolean;
+  connectionMessage?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -287,6 +320,7 @@ export interface DeploymentQueueItem {
   deployedAt?: string;
   createdAt: string;
   updatedAt: string;
+  page?: ContentPage;
   logs?: DeploymentLog[];
 }
 

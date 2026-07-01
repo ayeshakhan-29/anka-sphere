@@ -104,14 +104,10 @@ const STATUS_ORDER: PageStatus[] = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'REVISION'
                   <strong>{{ approvedCount() }}</strong> approved
                 </span>
               </div>
-              <button class="btn-add" type="button" (click)="addPage()" aria-label="Add page">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                Add Page
-              </button>
+              <button class="btn-add" type="button" (click)="addPage()" [disabled]="creatingPage()" aria-label="Add page"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>@if (creatingPage()) { Adding... } @else { Add Page }</button>
             </div>
 
-            @if (selectedPage()) {
-              <!-- Page editor -->
+            @if (pageError()) {<p class="page-error" role="alert">{{ pageError() }}</p>}@if (selectedPage()) {<!-- Page editor -->
               <div class="page-editor">
                 <div class="editor-header">
                   <button class="back-btn" type="button" (click)="selectedPage.set(null)" aria-label="Back to pages list">
@@ -442,7 +438,9 @@ const STATUS_ORDER: PageStatus[] = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'REVISION'
       cursor: pointer;
       transition: background 0.15s;
     }
-    .btn-add:hover { background: var(--color-border); }
+    .btn-add:hover:not(:disabled) { background: var(--color-border); }
+    .btn-add:disabled { opacity: 0.65; cursor: not-allowed; }
+    .page-error { font-size: 12.5px; color: var(--color-destructive); margin: -6px 0 12px; }
 
     /* Page list */
     .page-list { display: flex; flex-direction: column; gap: 6px; }
@@ -705,6 +703,8 @@ export class WrittenContent implements OnInit {
   });
 
   protected pages = signal<ContentPage[]>([]);
+  protected creatingPage = signal(false);
+  protected pageError = signal<string | null>(null);
 
   protected selectedPage = signal<ContentPage | null>(null);
 
@@ -760,11 +760,20 @@ export class WrittenContent implements OnInit {
   }
 
   protected addPage() {
-    this.projectService.createPage(this.projectId, { title: '', status: 'DRAFT', sortOrder: this.pages().length + 1 })
-      .subscribe(p => {
-        const page: ContentPage = { id: p.id, title: p.title, slug: p.slug ?? '', body: p.body ?? '', status: p.status as PageStatus, wordCount: p.wordCount ?? 0, seoTitle: p.metaTitle ?? '', seoDescription: p.metaDescription ?? '' };
-        this.pages.update(list => [...list, page]);
-        this.selectedPage.set(page);
+    this.creatingPage.set(true);
+    this.pageError.set(null);
+    this.projectService.createPage(this.projectId, { title: 'Untitled Page', status: 'DRAFT', sortOrder: this.pages().length + 1 })
+      .subscribe({
+        next: p => {
+          const page: ContentPage = { id: p.id, title: p.title, slug: p.slug ?? '', body: p.body ?? '', status: p.status as PageStatus, wordCount: p.wordCount ?? 0, seoTitle: p.metaTitle ?? '', seoDescription: p.metaDescription ?? '' };
+          this.pages.update(list => [...list, page]);
+          this.selectedPage.set(page);
+          this.creatingPage.set(false);
+        },
+        error: err => {
+          this.pageError.set(err?.error?.error ?? 'Failed to create page.');
+          this.creatingPage.set(false);
+        },
       });
   }
 
@@ -832,3 +841,7 @@ export class WrittenContent implements OnInit {
     });
   }
 }
+
+
+
+

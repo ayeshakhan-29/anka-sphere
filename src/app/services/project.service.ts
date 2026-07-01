@@ -13,6 +13,9 @@ import {
   Marketing,
   MarketingTask,
   Milestone,
+  DeploymentLog,
+  MaintenanceRequest,
+  QaTemplateItem,
   Persona,
   Competitor,
   CreateProjectDto,
@@ -272,6 +275,9 @@ export class ProjectService {
 
   // ── WP Plugins ──────────────────────────────────────────────────────────
 
+  getAllDeploymentLogs(projectId: string) {
+    return this.api.get<DeploymentLog[]>(`/projects/${projectId}/development/logs`);
+  }
   getWpPlugins(projectId: string) {
     return this.api.get<any[]>(`/projects/${projectId}/development/wp-plugins`);
   }
@@ -308,5 +314,24 @@ export class ProjectService {
 
   triggerProjectBackup(projectId: string) {
     return this.api.post<any>(`/projects/${projectId}/development/backup`, {});
+  }
+  saveQaTemplate(projectId: string, items: QaTemplateItem[]) {
+    return this.api.put<{ items: QaTemplateItem[] }>(`/projects/${projectId}/development/qa-template`, { items });
+  }
+
+  createMaintenanceRequest(projectId: string, data: Partial<MaintenanceRequest>) {
+    return this.api.post<MaintenanceRequest>(`/projects/${projectId}/development/maintenance-requests`, data);
+  }
+
+  updateMaintenanceRequest(projectId: string, requestId: string, data: Partial<MaintenanceRequest>) {
+    return this.api.patch<MaintenanceRequest>(`/projects/${projectId}/development/maintenance-requests/${requestId}`, data);
+  }
+
+  deleteMaintenanceRequest(projectId: string, requestId: string) {
+    return this.api.delete<void>(`/projects/${projectId}/development/maintenance-requests/${requestId}`);
+  }
+
+  checkUptime(projectId: string) {
+    return this.api.post<{ status: string; responseTime: number | null; lastChecked: string | null }>(`/projects/${projectId}/development/uptime-check`, {});
   }
 }

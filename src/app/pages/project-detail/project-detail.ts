@@ -1,5 +1,7 @@
 import { Component, inject, OnInit, OnDestroy, computed, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Subscription } from 'rxjs';
+import { distinctUntilChanged, switchMap, tap } from 'rxjs/operators';
 import { Badge } from '../../ui';
 import { ProjectService } from '../../services/project.service';
 import { ProjectStateService } from '../../services/project-state.service';
@@ -493,6 +495,7 @@ export class ProjectDetail implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private projectService = inject(ProjectService);
   protected state = inject(ProjectStateService);
+  private routeSub?: Subscription;
 
   protected loadError = computed(() => this.state.loading() ? null : (this.state.project() ? null : this._error));
   private _error: string | null = null;
@@ -534,9 +537,15 @@ export class ProjectDetail implements OnInit, OnDestroy {
   });
 
   ngOnInit() {
-    const id = this.route.snapshot.paramMap.get('id') ?? '';
-    this.state.loading.set(true);
-    this.projectService.getProject(id).subscribe({
+    this.routeSub = this.route.paramMap.pipe(
+      distinctUntilChanged((prev, curr) => prev.get('id') === curr.get('id')),
+      tap(() => {
+        this._error = null;
+        this.state.clear();
+        this.state.loading.set(true);
+      }),
+      switchMap(params => this.projectService.getProject(params.get('id') ?? '')),
+    ).subscribe({
       next: (project) => {
         this.state.setProject(project);
         this.state.loading.set(false);
@@ -549,6 +558,7 @@ export class ProjectDetail implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.routeSub?.unsubscribe();
     this.state.clear();
   }
 
