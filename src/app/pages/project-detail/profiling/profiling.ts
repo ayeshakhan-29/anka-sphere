@@ -82,15 +82,15 @@ interface Milestone {
                 <input id="company-name" class="field-input" type="text" formControlName="companyName" placeholder="e.g. Lumina Studios" />
               </div>
               <div class="field span-2">
-                <label class="field-label" for="industry">Industry / Niche <span class="req" aria-hidden="true">*</span></label>
+                <label class="field-label" for="industry">Industry / Niche</label>
                 <input id="industry" class="field-input" type="text" formControlName="industry" placeholder="e.g. Creative Agency, E-Commerce" />
               </div>
               <div class="field span-full">
-                <label class="field-label" for="about">About the Business <span class="req" aria-hidden="true">*</span></label>
+                <label class="field-label" for="about">About the Business</label>
                 <textarea id="about" class="field-textarea" formControlName="about" rows="4" placeholder="Briefly describe what the client does, who they serve, and their business model."></textarea>
               </div>
               <div class="field span-full">
-                <label class="field-label" for="objectives">Project Objectives <span class="req" aria-hidden="true">*</span></label>
+                <label class="field-label" for="objectives">Project Objectives</label>
                 <textarea id="objectives" class="field-textarea" formControlName="objectives" rows="4" placeholder="What does the client want to achieve? e.g. launch a new website, grow organic traffic, refresh branding."></textarea>
               </div>
               <div class="field span-full">
@@ -112,7 +112,7 @@ interface Milestone {
               </div>
             </div>
             <div class="form-actions">
-              <button class="btn-save" type="button" (click)="saveBrief()">Save Brief</button>
+              <button class="btn-save" type="button" (click)="saveBrief()" [disabled]="saving()">@if (saving()) { Saving... } @else if (saveSuccess()) { Saved } @else { Save Brief }</button>
             </div>
           </section>
         }
@@ -122,7 +122,7 @@ interface Milestone {
           <section aria-label="Brand Inputs" [formGroup]="brandForm">
             <div class="form-grid">
               <div class="field span-full">
-                <label class="field-label" for="brand-voice">Brand Voice & Tone <span class="req" aria-hidden="true">*</span></label>
+                <label class="field-label" for="brand-voice">Brand Voice & Tone</label>
                 <textarea id="brand-voice" class="field-textarea" formControlName="brandVoice" rows="3" placeholder="e.g. Professional but approachable, authoritative, friendly, minimal jargon."></textarea>
               </div>
               <div class="field span-full">
@@ -147,7 +147,7 @@ interface Milestone {
               </div>
             </div>
             <div class="form-actions">
-              <button class="btn-save" type="button" (click)="saveBrand()">Save Brand Inputs</button>
+              <button class="btn-save" type="button" (click)="saveBrand()" [disabled]="saving()">@if (saving()) { Saving... } @else if (saveSuccess()) { Saved } @else { Save Brand Inputs }</button>
             </div>
           </section>
         }
@@ -234,7 +234,7 @@ interface Milestone {
           <section aria-label="SEO Foundation" [formGroup]="seoForm">
             <div class="form-grid">
               <div class="field span-full">
-                <label class="field-label" for="primary-kw">Primary Keywords <span class="req" aria-hidden="true">*</span></label>
+                <label class="field-label" for="primary-kw">Primary Keywords</label>
                 <textarea id="primary-kw" class="field-textarea" formControlName="primaryKeywords" rows="3" placeholder="List main target keywords, one per line or comma-separated.&#10;e.g. brand design agency london, logo designer uk"></textarea>
               </div>
               <div class="field span-full">
@@ -255,7 +255,7 @@ interface Milestone {
               </div>
             </div>
             <div class="form-actions">
-              <button class="btn-save" type="button" (click)="saveSeo()">Save SEO Foundation</button>
+              <button class="btn-save" type="button" (click)="saveSeo()" [disabled]="saving()">@if (saving()) { Saving... } @else if (saveSuccess()) { Saved } @else { Save SEO Foundation }</button>
             </div>
           </section>
         }
@@ -395,6 +395,19 @@ interface Milestone {
             }
           </section>
         }
+        <section class="gate-card" aria-label="Profiling gate approval">
+          <div>
+            <h4 class="gate-title">Profiling Gate</h4>
+            <p class="gate-copy">Complete this stage when the company / brand name is saved.</p>
+            @if (gateError()) {
+              <p class="gate-error" role="alert">{{ gateError() }}</p>
+            }
+          </div>
+          <button class="btn-gate" type="button" (click)="completeGate()" [disabled]="!profilingComplete() || gateLoading()">
+            @if (gateLoading()) { Completing... }
+            @else { Complete Profiling Gate }
+          </button>
+        </section>
 
       </div>
     </div>
@@ -740,6 +753,52 @@ interface Milestone {
     .tl-bar { flex: 1; height: 6px; background: var(--color-surface-raised); border-radius: 10px; overflow: hidden; }
     .tl-fill { height: 100%; background: var(--color-accent); border-radius: 10px; transition: width 0.3s ease; }
 
+
+    .btn-save:disabled, .btn-gate:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    .gate-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 24px;
+      padding: 16px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      background: var(--color-surface-raised);
+    }
+    .gate-title {
+      margin: 0 0 4px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+    .gate-copy {
+      margin: 0;
+      font-size: 12.5px;
+      color: var(--color-text-secondary);
+    }
+    .gate-error {
+      margin: 8px 0 0;
+      font-size: 12px;
+      color: var(--color-destructive);
+    }
+    .btn-gate {
+      height: 38px;
+      padding: 0 18px;
+      background: var(--color-sidebar);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-md);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
     .empty-hint { font-size: 13px; color: var(--color-text-muted); padding: 12px 0; }
 
     /* Gate tab */
@@ -827,26 +886,26 @@ export class Profiling implements OnInit {
 
   protected tabs: { id: TabId; label: string; required: boolean }[] = [
     { id: 'brief',       label: 'Client Brief',       required: true },
-    { id: 'brand',       label: 'Brand Inputs',       required: true },
+    { id: 'brand',       label: 'Brand Inputs',       required: false },
     { id: 'personas',    label: 'Target Personas',    required: false },
     { id: 'competitors', label: 'Competitors',        required: false },
-    { id: 'seo',         label: 'SEO Foundation',     required: true },
+    { id: 'seo',         label: 'SEO Foundation',     required: false },
     { id: 'timeline',    label: 'Timeline',           required: false },
     { id: 'gate',        label: 'Gate Approval',      required: false },
   ];
 
   protected briefForm = this.fb.group({
     companyName:  ['', Validators.required],
-    industry:     ['', Validators.required],
-    about:        ['', Validators.required],
-    objectives:   ['', Validators.required],
+    industry:     [''],
+    about:        [''],
+    objectives:   [''],
     scope:        [''],
     budget:       [''],
     priority:     [''],
   });
 
   protected brandForm = this.fb.group({
-    brandVoice:   ['', Validators.required],
+    brandVoice:   [''],
     tagline:      [''],
     brandColours: [''],
     typography:   [''],
@@ -855,7 +914,7 @@ export class Profiling implements OnInit {
   });
 
   protected seoForm = this.fb.group({
-    primaryKeywords:   ['', Validators.required],
+    primaryKeywords:   [''],
     secondaryKeywords: [''],
     existingDomain:    [''],
     localSeo:          [''],
@@ -866,14 +925,12 @@ export class Profiling implements OnInit {
   protected competitors = signal<Competitor[]>([]);
   protected milestones = signal<Milestone[]>([]);
 
-  protected profilingComplete = computed(() =>
-    this.briefForm.valid && this.brandForm.valid && this.seoForm.valid
-  );
+  protected profilingComplete = computed(() => this.briefForm.controls.companyName.valid);
 
   protected tabFilled(id: TabId): boolean {
     if (id === 'brief')   return this.briefForm.valid;
-    if (id === 'brand')   return this.brandForm.valid;
-    if (id === 'seo')     return this.seoForm.valid;
+    if (id === 'brand')   return true;
+    if (id === 'seo')     return true;
     return true;
   }
 
@@ -891,11 +948,24 @@ export class Profiling implements OnInit {
         industry:    profiling.industry ?? '',
         about:       profiling.about ?? '',
         objectives:  profiling.objectives ?? '',
+        scope:       profiling.scope ?? '',
+        budget:      profiling.budget ?? '',
+        priority:    profiling.priority ?? '',
       });
-      this.brandForm.patchValue({ brandVoice: profiling.brandVoice ?? '' });
+      this.brandForm.patchValue({
+        brandVoice:    profiling.brandVoice ?? '',
+        tagline:       profiling.tagline ?? '',
+        brandColours:  profiling.brandColours ?? '',
+        typography:    profiling.typography ?? '',
+        brandRefs:     profiling.brandRefs ?? '',
+        brandDislikes: profiling.brandDislikes ?? '',
+      });
       this.seoForm.patchValue({
         primaryKeywords:   profiling.primaryKeywords ?? '',
         secondaryKeywords: profiling.secondaryKeywords ?? '',
+        existingDomain:    profiling.existingDomain ?? '',
+        localSeo:          profiling.localSeo ?? '',
+        seoNotes:          profiling.seoNotes ?? '',
       });
       this.personas.set((profiling.personas ?? []).map(p => ({
         id: p.id, name: p.name ?? '', age: p.age ?? '', role: p.role ?? '',
@@ -922,9 +992,20 @@ export class Profiling implements OnInit {
       industry:          b.industry ?? undefined,
       about:             b.about ?? undefined,
       objectives:        b.objectives ?? undefined,
+      scope:             b.scope ?? undefined,
+      budget:            b.budget ?? undefined,
+      priority:          b.priority ?? undefined,
       brandVoice:        br.brandVoice ?? undefined,
+      tagline:           br.tagline ?? undefined,
+      brandColours:      br.brandColours ?? undefined,
+      typography:        br.typography ?? undefined,
+      brandRefs:         br.brandRefs ?? undefined,
+      brandDislikes:     br.brandDislikes ?? undefined,
       primaryKeywords:   s.primaryKeywords ?? undefined,
       secondaryKeywords: s.secondaryKeywords ?? undefined,
+      existingDomain:    s.existingDomain ?? undefined,
+      localSeo:          s.localSeo ?? undefined,
+      seoNotes:          s.seoNotes ?? undefined,
     });
   }
 
@@ -1019,3 +1100,6 @@ export class Profiling implements OnInit {
     });
   }
 }
+
+
+

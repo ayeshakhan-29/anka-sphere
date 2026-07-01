@@ -1,12 +1,19 @@
 {
-  "/projects/**": {
-    "target": "http://localhost:3000",
-    "secure": false,
-    "logLevel": "debug"
-  },
-  "/maintenance/**": {
-    "target": "http://localhost:3000",
-    "secure": false,
-    "logLevel": "debug"
-  }
+    "/auth/**":  {
+                     "target":  "http://localhost:3010",
+                     "secure":  false,
+                     "logLevel":  "debug"
+                 },
+    "/projects/**":  {
+                         "target":  "http://localhost:3010",
+                         "secure":  false,
+                         "logLevel":  "debug"
+                     },
+    "/maintenance/**":  {
+                            "target":  "http://localhost:3010",
+                            "secure":  false,
+                            "logLevel":  "debug"
+                        }
 }
+
+

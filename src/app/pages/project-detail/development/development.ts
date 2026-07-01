@@ -1,12 +1,13 @@
-import { Component, signal, computed, inject, OnInit } from '@angular/core';
+import { Component, signal, computed, inject, OnInit, OnDestroy } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators, FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
+import { Subscription } from 'rxjs';
+import { distinctUntilChanged } from 'rxjs/operators';
 import { Badge } from '../../../ui';
 import { ProjectService } from '../../../services/project.service';
 import { ProjectStateService } from '../../../services/project-state.service';
-import { AuthService } from '../../../services/auth.service';
 import { NotificationService } from '../../../services/notification.service';
-import { DesignAsset, ContentPage, Project, BackupEntry, ChangeLogEntry } from '../../../models/project.models';
+import { DesignAsset, ContentPage, Project, BackupEntry, ChangeLogEntry, DeploymentLog, MaintenanceRequest } from '../../../models/project.models';
 import {
   WpConnection, WpConnectionUpsert, DeploymentQueueItem,
   WPPlugin, WPPluginUpsert, WPTheme, WPThemeUpsert,
@@ -332,11 +333,14 @@ const QUEUE_STATUS_ORDER: QueueItemStatus[] = ['QUEUED', 'IN_PROGRESS', 'IN_QA',
             </div>
             <div class="conn-grid">
               @for (env of envs; track env) {
-                <div class="conn-card" [class.conn-card--active]="connectionsByEnv()[env]?.status === 'ACTIVE'">
+                <div class="conn-card" [class.conn-card--active]="connectionOk(env)" [class.conn-card--lost]="connectionLost(env)">
                   <div class="conn-env-header">
                     <span class="conn-env-badge" [class]="'env-' + env.toLowerCase()">{{ env }}</span>
                     @if (connectionsByEnv()[env]) {
-                      <span class="conn-status-dot" [class.active]="connectionsByEnv()[env]!.status === 'ACTIVE'" [attr.aria-label]="connectionsByEnv()[env]!.status"></span>
+                      <span class="conn-health" [class.conn-health--ok]="connectionOk(env)" [class.conn-health--lost]="connectionLost(env)">
+                        <span class="conn-status-dot" [class.active]="connectionOk(env)" [class.lost]="connectionLost(env)" [attr.aria-label]="connectionMessage(env)"></span>
+                        <span class="conn-status-text">{{ connectionMessage(env) }}</span>
+                      </span>
                     }
                   </div>
                   <div class="conn-form">
@@ -482,6 +486,19 @@ const QUEUE_STATUS_ORDER: QueueItemStatus[] = ['QUEUED', 'IN_PROGRESS', 'IN_QA',
                         <span class="queue-deployed-at">{{ formatDate(item.deployedAt) }}</span>
                       }
                     </div>
+
+                    @if (linkedPage(item)) {
+                      <div class="queue-content-preview">
+                        <div class="preview-row">
+                          <span class="preview-label">Copy</span>
+                          <p class="preview-text">{{ queueCopyPreview(item) || 'No approved body copy added yet.' }}</p>
+                        </div>
+                        <div class="preview-grid">
+                          <div><span class="preview-label">SEO Title</span><span class="preview-value">{{ queueSeoTitle(item) || 'Missing' }}</span></div>
+                          <div><span class="preview-label">SEO Description</span><span class="preview-value">{{ queueSeoDescription(item) || 'Missing' }}</span></div>
+                        </div>
+                      </div>
+                    }
 
                     <!-- QA Drawer -->
                     @if (qaDrawerItemId() === item.id) {
@@ -856,26 +873,23 @@ const QUEUE_STATUS_ORDER: QueueItemStatus[] = ['QUEUED', 'IN_PROGRESS', 'IN_QA',
 
                 <!-- Uptime & Health Monitoring -->
                 <div class="m-card">
-                  <h4 class="m-card-title">Uptime & Health Monitoring</h4>
+                  <div class="m-card-header-row">
+                    <h4 class="m-card-title">Uptime & Health Monitoring</h4>
+                    <button class="btn-save btn-save--sm" type="button" (click)="checkUptime()" [disabled]="uptimeChecking() || !briefForm.controls.liveUrl.value">
+                      @if (uptimeChecking()) { Checking... }
+                      @else { Check Now }
+                    </button>
+                  </div>
                   <div class="uptime-widget">
                     @if (briefForm.controls.liveUrl.value) {
                       <div class="uptime-row">
-                        <span class="uptime-badge" [class.up]="stageComplete()">{{ stageComplete() ? 'UP' : 'UNKNOWN' }}</span>
+                        <span class="uptime-badge" [class.up]="uptimeStatus() === 'UP'" [class.down]="uptimeStatus() === 'DOWN'">{{ uptimeBadgeLabel() }}</span>
                         <span class="uptime-url">{{ briefForm.controls.liveUrl.value }}</span>
                       </div>
                       <div class="uptime-stats">
-                        <div class="stat-box">
-                          <span class="stat-val">{{ stageComplete() ? '200 OK' : '—' }}</span>
-                          <span class="stat-lbl">Status</span>
-                        </div>
-                        <div class="stat-box">
-                          <span class="stat-val">{{ stageComplete() ? '242ms' : '—' }}</span>
-                          <span class="stat-lbl">Response Time</span>
-                        </div>
-                        <div class="stat-box">
-                          <span class="stat-val">{{ stageComplete() ? 'Just now' : '—' }}</span>
-                          <span class="stat-lbl">Last Checked</span>
-                        </div>
+                        <div class="stat-box"><span class="stat-val">{{ uptimeBadgeLabel() }}</span><span class="stat-lbl">Status</span></div>
+                        <div class="stat-box"><span class="stat-val">{{ uptimeResponseTime() ? uptimeResponseTime() + 'ms' : '-' }}</span><span class="stat-lbl">Response Time</span></div>
+                        <div class="stat-box"><span class="stat-val">{{ uptimeLastChecked() ? formatDate(uptimeLastChecked()!) : '-' }}</span><span class="stat-lbl">Last Checked</span></div>
                       </div>
                     } @else {
                       <p class="m-empty-text">Add a Live URL in the Dev Brief to enable uptime monitoring.</p>
@@ -885,16 +899,42 @@ const QUEUE_STATUS_ORDER: QueueItemStatus[] = ['QUEUED', 'IN_PROGRESS', 'IN_QA',
 
                 <!-- Maintenance Tasks Queue -->
                 <div class="m-card">
-                  <h4 class="m-card-title">Maintenance Task Queue</h4>
-                  @if (tasksByStatus('MAINTENANCE').length === 0) {
-                    <p class="m-empty-text">No active maintenance requests in queue. Move tasks to the Maintenance column in Kanban to track them here.</p>
+                  <div class="m-card-header-row">
+                    <h4 class="m-card-title">Maintenance Task Queue</h4>
+                    <button class="btn-add btn-add--sm" type="button" (click)="showAddMaintenanceRequest.set(true)">Add Request</button>
+                  </div>
+                  @if (showAddMaintenanceRequest()) {
+                    <div class="cl-add-form">
+                      <div class="cl-field-row">
+                        <input class="field-input cl-field" type="text" [value]="newMaintenanceRequest().title" (input)="newMaintenanceRequest.update(v => ({...v, title: $any($event.target).value}))" placeholder="Request title" />
+                        <select class="field-input cl-field" [value]="newMaintenanceRequest().priority" (change)="newMaintenanceRequest.update(v => ({...v, priority: $any($event.target).value}))">
+                          <option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option>
+                        </select>
+                      </div>
+                      <input class="field-input" type="text" [value]="newMaintenanceRequest().target" (input)="newMaintenanceRequest.update(v => ({...v, target: $any($event.target).value}))" placeholder="Target page or feature" />
+                      <textarea class="field-textarea" rows="2" [value]="newMaintenanceRequest().description" (input)="newMaintenanceRequest.update(v => ({...v, description: $any($event.target).value}))" placeholder="Request description"></textarea>
+                      <div class="cl-add-actions">
+                        <button class="btn-save btn-save--sm" type="button" (click)="createMaintenanceRequest()" [disabled]="!newMaintenanceRequest().title || !newMaintenanceRequest().description">Save</button>
+                        <button class="btn-cancel btn-cancel--sm" type="button" (click)="showAddMaintenanceRequest.set(false)">Cancel</button>
+                      </div>
+                    </div>
+                  }
+                  @if (maintenanceRequests().length === 0 && tasksByStatus('MAINTENANCE').length === 0) {
+                    <p class="m-empty-text">No active maintenance requests in queue.</p>
                   } @else {
                     <div class="m-task-list">
-                      @for (task of tasksByStatus('MAINTENANCE'); track task.id) {
+                      @for (request of maintenanceRequests(); track request.id) {
                         <div class="m-task-row">
-                          <span class="m-task-title">{{ task.title }}</span>
-                          <span class="m-task-priority" [class]="'p-' + task.priority.toLowerCase()">{{ task.priority }}</span>
+                          <div><span class="m-task-title">{{ request.title }}</span><span class="m-task-target">{{ request.target || 'General' }}</span></div>
+                          <select class="m-status-select" [value]="request.status" (change)="updateMaintenanceRequestStatus(request.id, $any($event.target).value)">
+                            <option value="OPEN">Open</option><option value="IN_PROGRESS">In Progress</option><option value="DONE">Done</option>
+                          </select>
+                          <span class="m-task-priority" [class]="'p-' + request.priority.toLowerCase()">{{ request.priority }}</span>
+                          <button class="cl-delete" type="button" (click)="deleteMaintenanceRequest(request.id)" aria-label="Delete maintenance request">&times;</button>
                         </div>
+                      }
+                      @for (task of tasksByStatus('MAINTENANCE'); track task.id) {
+                        <div class="m-task-row"><span class="m-task-title">{{ task.title }}</span><span class="m-task-priority" [class]="'p-' + task.priority.toLowerCase()">{{ task.priority }}</span></div>
                       }
                     </div>
                   }
@@ -1171,13 +1211,19 @@ const QUEUE_STATUS_ORDER: QueueItemStatus[] = ['QUEUED', 'IN_PROGRESS', 'IN_QA',
     .conn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
     .conn-card { border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 16px; background: var(--color-surface); }
     .conn-card--active { border-color: var(--color-accent); }
+    .conn-card--lost { border-color: var(--color-destructive); }
     .conn-env-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
     .conn-env-badge { font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 10px; letter-spacing: 0.04em; }
     .env-dev { background: #EFF6FF; color: #3B82F6; }
     .env-staging { background: #FEF3C7; color: #D97706; }
     .env-production { background: #FEE2E2; color: #DC2626; }
-    .conn-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-border-strong); }
+    .conn-health { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: var(--color-text-muted); }
+    .conn-health--ok { color: var(--color-accent); }
+    .conn-health--lost { color: var(--color-destructive); }
+    .conn-status-dot { width: 8px; height: 8px; min-width: 8px; border-radius: 50%; background: var(--color-border-strong); }
     .conn-status-dot.active { background: var(--color-accent); }
+    .conn-status-dot.lost { background: var(--color-destructive); }
+    .conn-status-text { max-width: 145px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .conn-form { display: flex; flex-direction: column; gap: 10px; }
     .conn-field { display: flex; flex-direction: column; gap: 4px; }
     .conn-pw-row { display: flex; gap: 4px; }
@@ -1235,6 +1281,16 @@ const QUEUE_STATUS_ORDER: QueueItemStatus[] = ['QUEUED', 'IN_PROGRESS', 'IN_QA',
     .qa-fail { color: var(--color-destructive); }
     .queue-deployed-at { color: var(--color-text-muted); font-size: 11px; }
 
+    .queue-content-preview { margin-top: 10px; padding: 10px 12px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 8px; }
+    .preview-row { display: flex; flex-direction: column; gap: 3px; }
+    .preview-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-muted); }
+    .preview-text { font-size: 12.5px; color: var(--color-text-secondary); margin: 0; line-height: 1.5; }
+    .preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .preview-grid > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    .preview-value { font-size: 12px; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .qa-header-actions { display: flex; align-items: center; gap: 6px; }
+    .deployment-history { margin-top: 14px; padding: 14px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
+    .deployment-history-title { font-size: 13px; font-weight: 600; margin: 0 0 10px; color: var(--color-text); }
     /* QA Drawer */
     .qa-drawer { margin-top: 12px; padding: 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
     .qa-drawer-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
@@ -1294,6 +1350,7 @@ const QUEUE_STATUS_ORDER: QueueItemStatus[] = ['QUEUED', 'IN_PROGRESS', 'IN_QA',
     .uptime-row { display: flex; align-items: center; gap: 8px; }
     .uptime-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: #EF4444; color: #fff; }
     .uptime-badge.up { background: #10B981; }
+    .uptime-badge.down { background: #EF4444; }
     .uptime-url { font-size: 13px; color: var(--color-text-secondary); font-family: var(--font-mono, monospace); }
     .uptime-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 5px; }
     .stat-box { display: flex; flex-direction: column; align-items: center; padding: 8px; background: var(--color-surface-raised); border-radius: var(--radius-md); text-align: center; }
@@ -1302,7 +1359,9 @@ const QUEUE_STATUS_ORDER: QueueItemStatus[] = ['QUEUED', 'IN_PROGRESS', 'IN_QA',
     
     .m-task-list { display: flex; flex-direction: column; gap: 8px; }
     .m-task-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--color-surface-raised); border-radius: var(--radius-md); border-left: 3px solid #9333EA; }
-    .m-task-title { font-size: 12.5px; font-weight: 500; color: var(--color-text); }
+    .m-task-title { font-size: 12.5px; font-weight: 500; color: var(--color-text); display: block; }
+    .m-task-target { font-size: 11px; color: var(--color-text-muted); display: block; margin-top: 2px; }
+    .m-status-select { height: 28px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text-secondary); font-size: 11.5px; }
     .m-task-priority { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px; text-transform: uppercase; }
     
     .backup-widget { display: flex; flex-direction: column; gap: 8px; }
@@ -1348,7 +1407,7 @@ const QUEUE_STATUS_ORDER: QueueItemStatus[] = ['QUEUED', 'IN_PROGRESS', 'IN_QA',
     }
   `]
 })
-export class DevelopmentTab implements OnInit {
+export class DevelopmentTab implements OnInit, OnDestroy {
   private fb              = inject(FormBuilder);
   private route           = inject(ActivatedRoute);
   private projectService  = inject(ProjectService);
@@ -1357,8 +1416,12 @@ export class DevelopmentTab implements OnInit {
   protected notifService    = inject(NotificationService);
   private auth            = inject(AuthService);
 
+  private routeSub?: Subscription;
+  private syncTimer?: ReturnType<typeof setTimeout>;
+  private currentProjectId = '';
+
   private get projectId(): string {
-    return this.route.parent?.snapshot.paramMap.get('id') ?? '';
+    return this.currentProjectId || (this.route.parent?.snapshot.paramMap.get('id') ?? '');
   }
 
   protected activeTab = signal<TabId>('brief');
@@ -1435,6 +1498,23 @@ export class DevelopmentTab implements OnInit {
     return map;
   });
 
+  protected connectionOk(env: WpEnv): boolean {
+    const conn = this.connectionsByEnv()[env];
+    return !!conn && conn.status === 'ACTIVE' && conn.connectionOk !== false;
+  }
+
+  protected connectionLost(env: WpEnv): boolean {
+    const conn = this.connectionsByEnv()[env];
+    return !!conn && !this.connectionOk(env);
+  }
+
+  protected connectionMessage(env: WpEnv): string {
+    const conn = this.connectionsByEnv()[env];
+    if (!conn) return 'Not connected';
+    if (conn.connectionMessage) return conn.connectionMessage;
+    return this.connectionOk(env) ? 'Connected' : 'Connection lost';
+  }
+
   // Deployment Queue
   protected queueItems = signal<DeploymentQueueItem[]>([]);
   protected showAddQueueItem = signal(false);
@@ -1460,6 +1540,9 @@ export class DevelopmentTab implements OnInit {
   ];
 
   protected qaItems = signal<QaCheckItem[]>([...this.defaultQaItems]);
+  protected qaTemplateSaving = signal(false);
+  protected deploymentLogs = signal<DeploymentLog[]>([]);
+  protected selectedDeployEnv = signal<WpEnv>('STAGING');
   protected expandedLogs = signal<string | null>(null);
   protected prodConfirmItem = signal<DeploymentQueueItem | null>(null);
   protected prodDeploying = signal(false);
@@ -1491,6 +1574,13 @@ export class DevelopmentTab implements OnInit {
   protected changeLog = signal<ChangeLogEntry[]>([]);
   protected showAddChangelog = signal(false);
   protected newChangelogEntry = signal<{ pageName: string; description: string; changedBy: string }>({ pageName: '', description: '', changedBy: '' });
+  protected maintenanceRequests = signal<MaintenanceRequest[]>([]);
+  protected showAddMaintenanceRequest = signal(false);
+  protected newMaintenanceRequest = signal<{ title: string; description: string; priority: 'LOW' | 'MEDIUM' | 'HIGH'; target: string; requestedBy: string }>({ title: '', description: '', priority: 'MEDIUM', target: '', requestedBy: '' });
+  protected uptimeChecking = signal(false);
+  protected uptimeStatus = signal<string>('UNKNOWN');
+  protected uptimeResponseTime = signal<number | null>(null);
+  protected uptimeLastChecked = signal<string | null>(null);
 
   protected lastBackupDate = computed(() => {
     const list = this.backupHistory();
@@ -1505,13 +1595,107 @@ export class DevelopmentTab implements OnInit {
     return list.length > 0 ? list[0].size : null;
   });
 
-  protected loadChangeLog() {
-    this.projectService.getChangeLog(this.projectId).subscribe({
-      next: entries => this.changeLog.set(entries),
-      error: () => this.changeLog.set([]),
+  protected loadChangeLog(projectId = this.projectId) {
+    this.projectService.getChangeLog(projectId).subscribe({
+      next: entries => {
+        if (this.isCurrentProject(projectId)) this.changeLog.set(entries);
+      },
+      error: () => {
+        if (this.isCurrentProject(projectId)) this.changeLog.set([]);
+      },
     });
   }
 
+  protected loadDeploymentLogs(projectId = this.projectId) {
+    this.projectService.getAllDeploymentLogs(projectId).subscribe({
+      next: logs => {
+        if (this.isCurrentProject(projectId)) this.deploymentLogs.set(logs);
+      },
+      error: () => {
+        if (this.isCurrentProject(projectId)) this.deploymentLogs.set([]);
+      },
+    });
+  }
+
+  protected linkedPage(item: DeploymentQueueItem): ContentPage | undefined {
+    return item.page ?? this.approvedPages().find(page => page.id === item.pageId);
+  }
+
+  protected queueSeoTitle(item: DeploymentQueueItem): string {
+    const page = this.linkedPage(item);
+    return page?.seoTitle ?? page?.metaTitle ?? '';
+  }
+
+  protected queueSeoDescription(item: DeploymentQueueItem): string {
+    const page = this.linkedPage(item);
+    return page?.seoDescription ?? page?.metaDescription ?? '';
+  }
+
+  protected queueCopyPreview(item: DeploymentQueueItem): string {
+    const body = this.linkedPage(item)?.body ?? '';
+    return body.length > 220 ? `${body.slice(0, 220).trim()}...` : body;
+  }
+
+  protected saveQaTemplate() {
+    this.qaTemplateSaving.set(true);
+    this.projectService.saveQaTemplate(this.projectId, this.qaItems()).subscribe({
+      next: () => {
+        this.qaTemplateSaving.set(false);
+        this.notifService.toast('QA template saved for this project', 'success');
+      },
+      error: () => {
+        this.qaTemplateSaving.set(false);
+        this.notifService.toast('Failed to save QA template', 'warning');
+      },
+    });
+  }
+
+  protected createMaintenanceRequest() {
+    const req = this.newMaintenanceRequest();
+    if (!req.title.trim() || !req.description.trim()) return;
+    this.projectService.createMaintenanceRequest(this.projectId, req).subscribe({
+      next: created => {
+        this.maintenanceRequests.update(items => [created, ...items]);
+        this.showAddMaintenanceRequest.set(false);
+        this.newMaintenanceRequest.set({ title: '', description: '', priority: 'MEDIUM', target: '', requestedBy: '' });
+      },
+      error: () => this.notifService.toast('Failed to add maintenance request', 'warning'),
+    });
+  }
+
+  protected updateMaintenanceRequestStatus(requestId: string, status: 'OPEN' | 'IN_PROGRESS' | 'DONE') {
+    this.projectService.updateMaintenanceRequest(this.projectId, requestId, { status }).subscribe({
+      next: updated => this.maintenanceRequests.update(items => items.map(item => item.id === requestId ? { ...item, status: updated?.status ?? status } : item)),
+      error: () => this.notifService.toast('Failed to update maintenance request', 'warning'),
+    });
+  }
+
+  protected deleteMaintenanceRequest(requestId: string) {
+    this.projectService.deleteMaintenanceRequest(this.projectId, requestId).subscribe(() => {
+      this.maintenanceRequests.update(items => items.filter(item => item.id !== requestId));
+    });
+  }
+
+  protected checkUptime() {
+    this.uptimeChecking.set(true);
+    this.projectService.checkUptime(this.projectId).subscribe({
+      next: result => {
+        this.uptimeStatus.set(result.status ?? 'UNKNOWN');
+        this.uptimeResponseTime.set(result.responseTime ?? null);
+        this.uptimeLastChecked.set(result.lastChecked ?? null);
+        this.uptimeChecking.set(false);
+      },
+      error: () => {
+        this.uptimeStatus.set('DOWN');
+        this.uptimeChecking.set(false);
+        this.notifService.toast('Uptime check failed', 'warning');
+      },
+    });
+  }
+
+  protected uptimeBadgeLabel(): string {
+    return this.uptimeStatus() === 'UP' ? 'UP' : this.uptimeStatus() === 'DEGRADED' ? 'DEGRADED' : this.uptimeStatus() === 'DOWN' ? 'DOWN' : 'UNKNOWN';
+  }
   protected addChangelogEntry() {
     const entry = this.newChangelogEntry();
     if (!entry.pageName || !entry.description) return;
@@ -1556,26 +1740,102 @@ export class DevelopmentTab implements OnInit {
   }
 
   ngOnInit() {
-    this.loadDevelopment();
-    this.loadConnections();
-    this.loadQueue();
-    this.loadPlugins();
-    this.loadThemes();
-    this.loadChangeLog();
-    setTimeout(() => this.syncApprovedPages(), 500);
+    this.routeSub = this.route.parent?.paramMap.pipe(
+      distinctUntilChanged((prev, curr) => prev.get('id') === curr.get('id')),
+    ).subscribe(params => {
+      const projectId = params.get('id') ?? '';
+      this.currentProjectId = projectId;
+      this.resetProjectLocalState();
+      this.loadProjectDevelopment(projectId);
+    });
   }
 
-  private loadDevelopment() {
-    const dev = this.state.project()?.development;
+  ngOnDestroy() {
+    this.routeSub?.unsubscribe();
+    if (this.syncTimer) clearTimeout(this.syncTimer);
+  }
+
+  private loadProjectDevelopment(projectId: string) {
+    this.loadDevelopment(projectId);
+    this.loadConnections(projectId);
+    this.loadQueue(projectId);
+    this.loadPlugins(projectId);
+    this.loadThemes(projectId);
+    this.loadChangeLog(projectId);
+    this.loadDeploymentLogs(projectId);
+    this.syncTimer = setTimeout(() => this.syncApprovedPages(projectId), 500);
+  }
+
+  private resetProjectLocalState() {
+    if (this.syncTimer) clearTimeout(this.syncTimer);
+    this.briefForm.reset({ techStack: '', repoUrl: '', stagingUrl: '', liveUrl: '', notes: '' });
+    this.tasks.set([]);
+    this.editingDesc.set(null);
+    this.saving.set(false);
+    this.saveSuccess.set(false);
+    this.gateSubmitting.set(false);
+    this.gateError.set(null);
+    this.gateSuccess.set(false);
+    this.connections.set([]);
+    this.connForms.set({});
+    this.pwVisible.set({});
+    this.connSaving.set({});
+    this.connSuccess.set({});
+    this.queueItems.set([]);
+    this.showAddQueueItem.set(false);
+    this.isSyncingApproved.set(false);
+    this.newQueueItem.set({ contentKind: 'PAGE', title: '', slug: '', targetEnv: 'STAGING' });
+    this.qaDrawerItemId.set(null);
+    this.qaNotes.set('');
+    this.newCustomQaLabel.set('');
+    this.qaItems.set([...this.defaultQaItems]);
+    this.qaTemplateSaving.set(false);
+    this.deploymentLogs.set([]);
+    this.selectedDeployEnv.set('STAGING');
+    this.expandedLogs.set(null);
+    this.prodConfirmItem.set(null);
+    this.prodDeploying.set(false);
+    this.plugins.set([]);
+    this.themes.set([]);
+    this.showAddPlugin.set(false);
+    this.showAddTheme.set(false);
+    this.newPlugin.set({ name: '', slug: '', version: '', status: 'INACTIVE', description: '' });
+    this.newTheme.set({ name: '', slug: '', version: '', status: 'INACTIVE', description: '' });
+    this.backingUp.set(false);
+    this.perfNotes.set('');
+    this.backupHistory.set([]);
+    this.changeLog.set([]);
+    this.showAddChangelog.set(false);
+    this.newChangelogEntry.set({ pageName: '', description: '', changedBy: '' });
+    this.maintenanceRequests.set([]);
+    this.showAddMaintenanceRequest.set(false);
+    this.newMaintenanceRequest.set({ title: '', description: '', priority: 'MEDIUM', target: '', requestedBy: '' });
+    this.uptimeChecking.set(false);
+    this.uptimeStatus.set('UNKNOWN');
+    this.uptimeResponseTime.set(null);
+    this.uptimeLastChecked.set(null);
+  }
+
+  private isCurrentProject(projectId: string): boolean {
+    return projectId === this.projectId;
+  }
+
+  private loadDevelopment(projectId = this.projectId) {
+    const project = this.state.project();
+    const dev = project?.id === projectId ? project.development : undefined;
     if (!dev) {
-      this.projectService.upsertDevelopment(this.projectId, {}).subscribe({
+      this.projectService.upsertDevelopment(projectId, {}).subscribe({
         next: () => {
-          this.projectService.getProject(this.projectId).subscribe(p => {
+          if (!this.isCurrentProject(projectId)) return;
+          this.projectService.getProject(projectId).subscribe(p => {
+            if (!this.isCurrentProject(projectId)) return;
             this.state.setProject(p);
             if (p.development) this.loadDevelopmentData(p.development);
           });
         },
-        error: () => this.notifService.toast('Failed to initialize development', 'warning'),
+        error: () => {
+          if (this.isCurrentProject(projectId)) this.notifService.toast('Failed to initialize development', 'warning');
+        },
       });
       return;
     }
@@ -1599,13 +1859,19 @@ export class DevelopmentTab implements OnInit {
     this.perfNotes.set(dev.performanceNotes ?? '');
     this.backupHistory.set(dev.backupLog ?? []);
     this.changeLog.set(dev.changeLog ?? []);
+    this.qaItems.set(dev.qaTemplate?.length ? dev.qaTemplate : [...this.defaultQaItems]);
+    this.maintenanceRequests.set(dev.maintenanceRequests ?? []);
+    this.uptimeStatus.set(dev.uptimeStatus ?? 'UNKNOWN');
+    this.uptimeResponseTime.set(dev.uptimeResponseTime ?? null);
+    this.uptimeLastChecked.set(dev.uptimeLastChecked ?? null);
   }
 
   // ── Connections ─────────────────────────────────────────────────────────
 
-  protected loadConnections() {
-    this.projectService.getWpConnections(this.projectId).subscribe({
+  protected loadConnections(projectId = this.projectId) {
+    this.projectService.getWpConnections(projectId).subscribe({
       next: conns => {
+        if (!this.isCurrentProject(projectId)) return;
         this.connections.set(conns);
         const forms: Record<string, Partial<WpConnectionUpsert>> = {};
         for (const c of conns) {
@@ -1613,7 +1879,9 @@ export class DevelopmentTab implements OnInit {
         }
         this.connForms.set(forms);
       },
-      error: () => this.connections.set([]),
+      error: () => {
+        if (this.isCurrentProject(projectId)) this.connections.set([]);
+      },
     });
   }
 
@@ -1638,31 +1906,42 @@ export class DevelopmentTab implements OnInit {
         this.connSuccess.update(v => ({ ...v, [env]: true }));
         setTimeout(() => this.connSuccess.update(v => ({ ...v, [env]: false })), 2000);
         this.loadConnections();
+        this.loadPlugins();
+        this.loadThemes();
       },
-      error: () => this.connSaving.update(v => ({ ...v, [env]: false })),
+      error: (err) => {
+        this.connSaving.update(v => ({ ...v, [env]: false }));
+        this.notifService.toast(err?.error?.error ?? 'Failed to save WordPress connection', 'warning');
+      },
     });
   }
 
   // ── Queue ───────────────────────────────────────────────────────────────
 
-  protected loadQueue() {
-    this.projectService.getDeploymentQueue(this.projectId).subscribe({
-      next: items => this.queueItems.set(items),
-      error: () => this.queueItems.set([]),
+  protected loadQueue(projectId = this.projectId) {
+    this.projectService.getDeploymentQueue(projectId).subscribe({
+      next: items => {
+        if (this.isCurrentProject(projectId)) this.queueItems.set(items);
+      },
+      error: () => {
+        if (this.isCurrentProject(projectId)) this.queueItems.set([]);
+      },
     });
   }
 
-  protected syncApprovedPages() {
+  protected syncApprovedPages(projectId = this.projectId) {
     this.isSyncingApproved.set(true);
-    this.projectService.syncApprovedPagesToQueue(this.projectId).subscribe({
+    this.projectService.syncApprovedPagesToQueue(projectId).subscribe({
       next: (result) => {
-        this.loadQueue();
+        if (!this.isCurrentProject(projectId)) return;
+        this.loadQueue(projectId);
         this.isSyncingApproved.set(false);
         if (result.count > 0) {
           this.notifService.toast(`Synced ${result.count} approved page(s) to queue`, 'success');
         }
       },
       error: () => {
+        if (!this.isCurrentProject(projectId)) return;
         this.isSyncingApproved.set(false);
         this.notifService.toast('Failed to sync approved pages', 'warning');
       },
@@ -1767,10 +2046,16 @@ export class DevelopmentTab implements OnInit {
 
   // ── Plugins ─────────────────────────────────────────────────────────────
 
-  protected loadPlugins() {
-    this.projectService.getWpPlugins(this.projectId).subscribe({
-      next: p => this.plugins.set(p),
-      error: () => this.plugins.set([]),
+  protected loadPlugins(projectId = this.projectId) {
+    this.projectService.getWpPlugins(projectId).subscribe({
+      next: p => {
+        if (this.isCurrentProject(projectId)) this.plugins.set(p);
+      },
+      error: (err) => {
+        if (!this.isCurrentProject(projectId)) return;
+        this.plugins.set([]);
+        this.notifService.toast(err?.error?.error ?? 'Failed to load WordPress plugins', 'warning');
+      },
     });
   }
 
@@ -1793,10 +2078,16 @@ export class DevelopmentTab implements OnInit {
 
   // ── Themes ──────────────────────────────────────────────────────────────
 
-  protected loadThemes() {
-    this.projectService.getWpThemes(this.projectId).subscribe({
-      next: t => this.themes.set(t),
-      error: () => this.themes.set([]),
+  protected loadThemes(projectId = this.projectId) {
+    this.projectService.getWpThemes(projectId).subscribe({
+      next: t => {
+        if (this.isCurrentProject(projectId)) this.themes.set(t);
+      },
+      error: (err) => {
+        if (!this.isCurrentProject(projectId)) return;
+        this.themes.set([]);
+        this.notifService.toast(err?.error?.error ?? 'Failed to load WordPress themes', 'warning');
+      },
     });
   }
 
