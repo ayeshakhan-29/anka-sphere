@@ -14,6 +14,7 @@ import {
   WpEnv, QueueItemStatus, QaStatus, ContentKind, DevTaskStatus,
 } from '../../../models/project.models';
 import { MaintenanceService } from '../../../services/maintenance.service';
+import { AuthService } from '../../../services/auth.service';
 
 type TabId = 'brief' | 'kanban' | 'assets' | 'content' | 'gate' | 'connections' | 'queue' | 'plugins' | 'themes' | 'maintenance';
 type AssetType = DesignAsset['type'];
