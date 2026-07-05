@@ -1,7 +1,7 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
-import { tap, catchError } from 'rxjs/operators';
-import { of, throwError } from 'rxjs';
+import { tap, catchError, timeout } from 'rxjs/operators';
+import { of, throwError, TimeoutError } from 'rxjs';
 import { ApiService } from './api.service';
 import { environment } from '../../environments/environment';
 
@@ -39,8 +39,11 @@ export class AuthService {
 
   login(email: string, password: string) {
     return this.api.post<LoginResponse>('/auth/login', { email, password }).pipe(
+      timeout(15000),
       tap((res) => this.persist(res)),
-      catchError((err) => {
+      catchError((rawErr) => {
+        // A hung request (e.g. a broken proxy) behaves like an unreachable server
+        const err = rawErr instanceof TimeoutError ? { status: 0 } : rawErr;
         // Backend unreachable — fall back to dev credentials in non-production
         if (!environment.production && err.status === 0) {
           const match = DEV_USERS[email];

@@ -240,9 +240,28 @@ export class Login {
     this.auth.login(email, password).subscribe({
       next: () => this.router.navigate(['/app/projects']),
       error: (err) => {
-        this.loginError.set(err.status === 401 ? 'Invalid email or password.' : 'Something went wrong. Please try again.');
+        this.loginError.set(this.describeLoginError(err));
         this.loading.set(false);
       },
     });
+  }
+
+  private describeLoginError(err: { status?: number; error?: { error?: string } }): string {
+    switch (err.status) {
+      case 400:
+      case 401:
+      case 422:
+        return err.error?.error ?? 'Invalid email or password.';
+      case 0:
+        return 'Cannot reach the server. Check your connection and try again.';
+      case 502:
+      case 503:
+      case 504:
+        return 'The server is unavailable right now (' + err.status + '). Please try again in a moment.';
+      case 429:
+        return 'Too many attempts. Please wait a minute and try again.';
+      default:
+        return `Sign-in failed (error ${err.status ?? 'unknown'}). Please try again or contact an admin.`;
+    }
   }
 }
