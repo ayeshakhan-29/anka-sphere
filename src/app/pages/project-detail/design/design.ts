@@ -46,6 +46,7 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
 @Component({
   selector: 'app-design',
   imports: [ReactiveFormsModule, Badge],
+  host: { '(window:beforeunload)': 'onBeforeUnload($event)' },
   template: `
     <div class="design-wrap">
 
@@ -770,6 +771,7 @@ export class DesignModule implements OnInit {
   protected aiUsage      = signal<AiUsage | null>(null);
 
   protected generateImage(): void {
+    if (this.hasUnsavedAiImage() && !confirm('The current image has not been saved to Assets and will be replaced. Continue?')) return;
     this.aiError.set(null);
     this.aiSaved.set(false);
     this.aiGenerating.set(true);
@@ -834,10 +836,25 @@ export class DesignModule implements OnInit {
   }
 
   protected discardAiResult(): void {
+    if (this.hasUnsavedAiImage() && !confirm('This image has not been saved to Assets. Discard it anyway?')) return;
     this.aiResult.set(null);
     this.aiSaved.set(false);
     this.aiEditInstruction.set('');
     this.aiError.set(null);
+  }
+
+  private hasUnsavedAiImage(): boolean {
+    return !!this.aiResult() && !this.aiSaved();
+  }
+
+  /** Route guard hook — see canDeactivate on the design route. */
+  canLeave(): boolean {
+    return !this.hasUnsavedAiImage()
+      || confirm('You have an AI image that has not been saved to Assets. It will be lost if you leave. Leave anyway?');
+  }
+
+  protected onBeforeUnload(e: BeforeUnloadEvent): void {
+    if (this.hasUnsavedAiImage()) e.preventDefault();
   }
 
   private loadAiUsage(): void {

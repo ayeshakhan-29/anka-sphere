@@ -25,7 +25,11 @@ export const routes: Routes = [
           { path: 'overview',     loadComponent: () => import('./pages/project-detail/project-overview').then(m => m.ProjectOverview) },
           { path: 'profiling',    loadComponent: () => import('./pages/project-detail/profiling/profiling').then(m => m.Profiling) },
           { path: 'content',      loadComponent: () => import('./pages/project-detail/written-content/written-content').then(m => m.WrittenContent) },
-          { path: 'design',       loadComponent: () => import('./pages/project-detail/design/design').then(m => m.DesignModule) },
+          {
+            path: 'design',
+            loadComponent: () => import('./pages/project-detail/design/design').then(m => m.DesignModule),
+            canDeactivate: [(component: { canLeave?: () => boolean }) => component.canLeave?.() ?? true],
+          },
           { path: 'development',  loadComponent: () => import('./pages/project-detail/development/development').then(m => m.DevelopmentTab) },
           { path: 'analytics',    loadComponent: () => import('./pages/project-detail/marketing/marketing').then(m => m.MarketingTab) },
           { path: 'reporting',    loadComponent: () => import('./pages/project-detail/reporting/reporting').then(m => m.ReportingTab) },
