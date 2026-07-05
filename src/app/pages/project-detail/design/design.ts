@@ -355,8 +355,31 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
                   @if (aiSaved()) {
                     <span class="ai-saved-ok" role="status">✓ Saved to asset library</span>
                   } @else {
-                    <button class="btn-save" type="button" (click)="saveAiImageToAssets()">Save to Assets</button>
+                    <button class="btn-save" type="button" (click)="saveAiImageToAssets()" [disabled]="aiEditing()">Save to Assets</button>
                   }
+                  <button class="btn-ghost" type="button" (click)="generateImage()"
+                    [disabled]="aiGenerating() || aiEditing()"
+                    aria-label="Regenerate with the same prompt">
+                    ↻ Regenerate
+                  </button>
+                  <button class="btn-ghost" type="button" (click)="discardAiResult()"
+                    [disabled]="aiGenerating() || aiEditing()">
+                    Discard
+                  </button>
+                </div>
+
+                <!-- Refine the current image -->
+                <div class="ai-edit-row">
+                  <input class="ai-edit-input" type="text"
+                    placeholder="Describe a change — e.g. make the bowl dark green, remove the mint leaf"
+                    [value]="aiEditInstruction()"
+                    (input)="aiEditInstruction.set($any($event.target).value)"
+                    [disabled]="aiEditing()"
+                    aria-label="Edit instruction for the generated image" />
+                  <button class="btn-save" type="button" (click)="editImage()"
+                    [disabled]="aiEditing() || aiGenerating() || aiEditInstruction().trim().length < 3">
+                    @if (aiEditing()) { Editing… } @else { Apply Edit }
+                  </button>
                 </div>
               </div>
             }
@@ -550,8 +573,14 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
     .ai-error { font-size: 12.5px; color: #DC2626; background: #FEF2F2; border: 1px solid #FECACA; border-radius: var(--radius-md); padding: 8px 12px; }
     .ai-result-img { max-width: 100%; max-height: 480px; object-fit: contain; border-radius: var(--radius-md); border: 1px solid var(--color-border); align-self: flex-start; }
     .ai-revised { font-size: 12px; color: var(--color-text-muted); font-style: italic; margin: 0; }
-    .ai-result-actions { display: flex; align-items: center; gap: 10px; }
+    .ai-result-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .ai-saved-ok { font-size: 12.5px; font-weight: 600; color: #16A34A; }
+    .btn-ghost { height: 34px; padding: 0 14px; background: transparent; color: var(--color-text-secondary); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.12s; }
+    .btn-ghost:hover:not(:disabled) { background: var(--color-surface-raised); }
+    .btn-ghost:disabled { opacity: 0.5; cursor: default; }
+    .ai-edit-row { display: flex; gap: 8px; align-items: center; }
+    .ai-edit-input { flex: 1; height: 36px; padding: 0 12px; border: 1.5px solid var(--color-border); border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 13px; color: var(--color-text); background: var(--color-surface); outline: none; }
+    .ai-edit-input:focus { border-color: var(--color-accent, #16A34A); }
     .ai-usage-title { font-size: 13px; font-weight: 600; color: var(--color-text); margin: 0; }
     .ai-usage-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
     .usage-stat { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; background: var(--color-surface-raised); border-radius: var(--radius-md); }
@@ -774,6 +803,41 @@ export class DesignModule implements OnInit {
       this.assets.update(list => [...list, { id: a.id, name: a.name, type: a.type as AssetType, url: a.url, thumbnailUrl: '', version: a.version, notes: a.notes ?? '', approvedAt: a.approvedAt ?? null }]);
       this.aiSaved.set(true);
     });
+  }
+
+  protected aiEditInstruction = signal('');
+  protected aiEditing         = signal(false);
+
+  protected editImage(): void {
+    const result = this.aiResult();
+    if (!result) return;
+    this.aiError.set(null);
+    this.aiSaved.set(false);
+    this.aiEditing.set(true);
+    this.projectService.editAiImage(this.projectId, {
+      image: result.image,
+      instruction: this.aiEditInstruction().trim(),
+      size: this.aiSize(),
+    }).subscribe({
+      next: (res) => {
+        this.aiResult.set(res);
+        this.aiEditInstruction.set('');
+        this.aiEditing.set(false);
+        this.loadAiUsage();
+      },
+      error: (err) => {
+        this.aiError.set(err?.error?.error ?? 'Image edit failed. Please try again.');
+        this.aiEditing.set(false);
+        this.loadAiUsage();
+      },
+    });
+  }
+
+  protected discardAiResult(): void {
+    this.aiResult.set(null);
+    this.aiSaved.set(false);
+    this.aiEditInstruction.set('');
+    this.aiError.set(null);
   }
 
   private loadAiUsage(): void {

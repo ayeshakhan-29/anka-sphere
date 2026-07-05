@@ -361,6 +361,10 @@ export class ProjectService {
     return this.api.post<AiImageResult>(`/projects/${projectId}/design/ai-images`, data);
   }
 
+  editAiImage(projectId: string, data: { image: string; instruction: string; size?: string }) {
+    return this.api.post<AiImageResult>(`/projects/${projectId}/design/ai-images/edit`, data);
+  }
+
   getAiUsage(projectId: string) {
     return this.api.get<AiUsage>(`/projects/${projectId}/design/ai-usage`);
   }
