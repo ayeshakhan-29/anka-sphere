@@ -368,4 +368,16 @@ export class ProjectService {
   getAiUsage(projectId: string) {
     return this.api.get<AiUsage>(`/projects/${projectId}/design/ai-usage`);
   }
+
+  generateAiCaptions(projectId: string, data: { platform: string; topic: string }) {
+    return this.api.post<{ variantA: string; variantB: string; hashtags: string[] }>(
+      `/projects/${projectId}/social/ai-captions`, data,
+    );
+  }
+
+  aiDraftReport(projectId: string, type: 'WEEKLY' | 'MONTHLY') {
+    return this.api.post<{ summary: string; highlights: string; blockers: string; nextSteps: string }>(
+      `/projects/${projectId}/reports/ai-draft`, { type },
+    );
+  }
 }

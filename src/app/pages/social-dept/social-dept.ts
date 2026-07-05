@@ -159,6 +159,34 @@ const ALL_PLATFORMS: Platform[] = ['Instagram', 'TikTok', 'Facebook', 'LinkedIn'
                 }
               </div>
 
+              <!-- AI caption writer -->
+              <div class="ai-writer">
+                <div class="composer-section-label">✨ AI caption writer</div>
+                <div class="ai-writer-row">
+                  <input class="ai-topic-input" type="text"
+                    placeholder="What is this post about? e.g. announcing our summer veg box"
+                    [value]="aiTopic()" (input)="aiTopic.set($any($event.target).value)"
+                    [disabled]="aiWriting()"
+                    aria-label="Post topic for AI caption writer" />
+                  <button class="btn-primary" (click)="writeAiCaptions()"
+                    [disabled]="aiWriting() || aiTopic().trim().length < 3 || !composerProjectId()">
+                    @if (aiWriting()) { Writing… } @else { Write captions }
+                  </button>
+                </div>
+                @if (!composerProjectId()) {
+                  <div class="ai-writer-hint">Select a project below first — captions are written in that client's brand voice.</div>
+                }
+                @if (aiCaptionError()) { <div class="ai-writer-error" role="alert">{{ aiCaptionError() }}</div> }
+                @if (aiHashtags().length > 0) {
+                  <div class="ai-ht-row" aria-label="Suggested hashtags">
+                    @for (tag of aiHashtags(); track tag) {
+                      <span class="ai-ht-chip">{{ tag }}</span>
+                    }
+                    <button class="ai-ht-insert" (click)="insertAiHashtags()">Insert into caption</button>
+                  </div>
+                }
+              </div>
+
               <!-- Variant + char counter -->
               <div class="variant-row">
                 <span class="composer-section-label" style="margin-bottom:0">Caption variant</span>
@@ -419,6 +447,18 @@ const ALL_PLATFORMS: Platform[] = ['Instagram', 'TikTok', 'Facebook', 'LinkedIn'
     .plat-btn { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1.5px solid var(--color-border); border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 12.5px; font-weight: 500; color: var(--color-text-secondary); background: var(--color-surface); cursor: pointer; transition: all 0.15s; }
     .plat-btn:hover { border-color: var(--plat-color, #EC4899); color: var(--plat-color, #EC4899); }
     .plat-btn.active { border-color: var(--plat-color, #EC4899); color: var(--plat-color, #EC4899); background: color-mix(in srgb, var(--plat-color, #EC4899) 10%, transparent); font-weight: 600; }
+    /* AI caption writer */
+    .ai-writer { display: flex; flex-direction: column; gap: 8px; padding: 14px; background: #FDF2F8; border: 1px solid #FBCFE8; border-radius: var(--radius-md); }
+    .ai-writer-row { display: flex; gap: 8px; }
+    .ai-topic-input { flex: 1; height: 34px; padding: 0 12px; border: 1.5px solid var(--color-border); border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 13px; color: var(--color-text); background: var(--color-surface); outline: none; }
+    .ai-topic-input:focus { border-color: #EC4899; }
+    .ai-writer-hint { font-size: 11.5px; color: var(--color-text-muted); }
+    .ai-writer-error { font-size: 12px; color: #DC2626; font-weight: 500; }
+    .ai-ht-row { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+    .ai-ht-chip { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 10px; background: #FCE7F3; color: #BE185D; }
+    .ai-ht-insert { height: 26px; padding: 0 10px; border: 1px solid #EC4899; border-radius: 13px; background: transparent; color: #BE185D; font-family: var(--font-sans); font-size: 11.5px; font-weight: 600; cursor: pointer; }
+    .ai-ht-insert:hover { background: #EC4899; color: #fff; }
+
     .variant-row { display: flex; align-items: center; gap: 10px; }
     .variant-toggle { display: flex; border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; }
     .var-btn { width: 34px; height: 28px; border: none; background: transparent; font-family: var(--font-sans); font-size: 12px; font-weight: 600; color: var(--color-text-secondary); cursor: pointer; transition: background 0.12s, color 0.12s; }
@@ -528,6 +568,12 @@ export class SocialDept implements OnInit {
 
   // Hashtags
   protected copiedSet = signal<string | null>(null);
+
+  // AI caption writer
+  protected aiTopic        = signal('');
+  protected aiWriting      = signal(false);
+  protected aiCaptionError = signal<string | null>(null);
+  protected aiHashtags     = signal<string[]>([]);
 
   // Date context — derived once, not reactive
   private readonly _now = new Date();
@@ -648,6 +694,34 @@ export class SocialDept implements OnInit {
   protected updateCaption(value: string): void {
     if (this.composerVariant() === 'A') this.captionA.set(value);
     else this.captionB.set(value);
+  }
+
+  protected writeAiCaptions(): void {
+    const projectId = this.composerProjectId();
+    if (!projectId) return;
+    this.aiCaptionError.set(null);
+    this.aiWriting.set(true);
+    this.projectService.generateAiCaptions(projectId, {
+      platform: this.composerPlatform(),
+      topic: this.aiTopic().trim(),
+    }).subscribe({
+      next: (res) => {
+        this.captionA.set(res.variantA);
+        this.captionB.set(res.variantB);
+        this.aiHashtags.set(res.hashtags);
+        this.aiWriting.set(false);
+      },
+      error: (err) => {
+        this.aiCaptionError.set(err?.error?.error ?? 'Caption writing failed. Please try again.');
+        this.aiWriting.set(false);
+      },
+    });
+  }
+
+  protected insertAiHashtags(): void {
+    const toAppend = (this.activeCaption().length > 0 ? '\n\n' : '') + this.aiHashtags().join(' ');
+    if (this.composerVariant() === 'A') this.captionA.update(v => v + toAppend);
+    else this.captionB.update(v => v + toAppend);
   }
 
   protected saveDraft(): void {

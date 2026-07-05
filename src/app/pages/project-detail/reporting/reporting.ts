@@ -111,11 +111,18 @@ interface PastReport {
             <div class="report-field">
               <div class="field-header">
                 <label class="field-label" for="wk-summary">Executive Summary</label>
-                <button type="button" class="auto-fill-btn" (click)="autoFillWeekly()" aria-label="Auto-fill summary from project data">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                  Auto-fill
-                </button>
+                <div class="field-header-actions">
+                  <button type="button" class="auto-fill-btn" (click)="aiDraft('weekly')" [disabled]="aiDrafting()"
+                    aria-label="Write the full weekly report with AI">
+                    @if (aiDrafting()) { ✨ Writing… } @else { ✨ AI Draft }
+                  </button>
+                  <button type="button" class="auto-fill-btn" (click)="autoFillWeekly()" aria-label="Auto-fill summary from project data">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    Auto-fill
+                  </button>
+                </div>
               </div>
+              @if (aiDraftError()) { <div class="ai-draft-error" role="alert">{{ aiDraftError() }}</div> }
               <textarea
                 id="wk-summary"
                 class="report-textarea"
@@ -280,11 +287,18 @@ interface PastReport {
             <div class="report-field">
               <div class="field-header">
                 <label class="field-label" for="mo-summary">Monthly Summary</label>
-                <button type="button" class="auto-fill-btn" (click)="autoFillMonthly()" aria-label="Auto-fill summary from project data">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                  Auto-fill
-                </button>
+                <div class="field-header-actions">
+                  <button type="button" class="auto-fill-btn" (click)="aiDraft('monthly')" [disabled]="aiDrafting()"
+                    aria-label="Write the full monthly report with AI">
+                    @if (aiDrafting()) { ✨ Writing… } @else { ✨ AI Draft }
+                  </button>
+                  <button type="button" class="auto-fill-btn" (click)="autoFillMonthly()" aria-label="Auto-fill summary from project data">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    Auto-fill
+                  </button>
+                </div>
               </div>
+              @if (aiDraftError()) { <div class="ai-draft-error" role="alert">{{ aiDraftError() }}</div> }
               <textarea
                 id="mo-summary"
                 class="report-textarea"
@@ -877,6 +891,8 @@ interface PastReport {
     .preview-link { font-size: 12px; font-weight: 500; color: #6366F1; text-decoration: none; }
     .preview-link:hover { text-decoration: underline; }
     .send-error { font-size: 12px; color: #DC2626; font-weight: 500; }
+    .field-header-actions { display: flex; gap: 6px; }
+    .ai-draft-error { font-size: 12px; color: #DC2626; font-weight: 500; margin-bottom: 6px; }
 
     @media (max-width: 900px) {
       .stats-strip { grid-template-columns: repeat(2, 1fr); }
@@ -917,6 +933,8 @@ export class ReportingTab implements OnInit {
   protected weeklyPreviewUrl  = signal<string | null>(null);
   protected monthlyPreviewUrl = signal<string | null>(null);
   protected sendError         = signal<string | null>(null);
+  protected aiDrafting        = signal(false);
+  protected aiDraftError      = signal<string | null>(null);
   private weeklyReportId: string | null = null;
   private monthlyReportId: string | null = null;
 
@@ -1075,6 +1093,27 @@ export class ReportingTab implements OnInit {
 
   private parseRecipients(raw: string): string[] {
     return raw.split(/[,;\s]+/).map(s => s.trim()).filter(s => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s));
+  }
+
+  protected aiDraft(type: 'weekly' | 'monthly') {
+    const pid = this.projectId;
+    if (!pid) return;
+    this.aiDraftError.set(null);
+    this.aiDrafting.set(true);
+    this.projectService.aiDraftReport(pid, type === 'weekly' ? 'WEEKLY' : 'MONTHLY').subscribe({
+      next: (d) => {
+        if (type === 'weekly') {
+          this.weeklyForm.patchValue({ summary: d.summary, blockers: d.blockers, nextPlan: d.nextSteps });
+        } else {
+          this.monthlyForm.patchValue({ summary: d.summary, highlights: d.highlights, nextGoals: d.nextSteps });
+        }
+        this.aiDrafting.set(false);
+      },
+      error: (err) => {
+        this.aiDraftError.set(err?.error?.error ?? 'AI drafting failed. Please try again.');
+        this.aiDrafting.set(false);
+      },
+    });
   }
 
   protected autoFillWeekly() {
