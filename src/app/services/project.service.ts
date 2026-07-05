@@ -19,6 +19,10 @@ import {
   Persona,
   Competitor,
   CreateProjectDto,
+  ProjectReport,
+  ReportUpsert,
+  AiUsage,
+  AiImageResult,
 } from '../models/project.models';
 
 @Injectable({ providedIn: 'root' })
@@ -333,5 +337,31 @@ export class ProjectService {
 
   checkUptime(projectId: string) {
     return this.api.post<{ status: string; responseTime: number | null; lastChecked: string | null }>(`/projects/${projectId}/development/uptime-check`, {});
+  }
+
+  // ── Reports ───────────────────────────────────────────────────────────────
+
+  getReports(projectId: string) {
+    return this.api.get<ProjectReport[]>(`/projects/${projectId}/reports`);
+  }
+
+  upsertReport(projectId: string, data: ReportUpsert) {
+    return this.api.put<ProjectReport>(`/projects/${projectId}/reports`, data);
+  }
+
+  sendReport(projectId: string, reportId: string, to: string[]) {
+    return this.api.post<{ report: ProjectReport; previewUrl?: string }>(
+      `/projects/${projectId}/reports/${reportId}/send`, { to },
+    );
+  }
+
+  // ── AI image generation ───────────────────────────────────────────────────
+
+  generateAiImage(projectId: string, data: { prompt: string; size?: string; saveToAssets?: boolean; assetName?: string }) {
+    return this.api.post<AiImageResult>(`/projects/${projectId}/design/ai-images`, data);
+  }
+
+  getAiUsage(projectId: string) {
+    return this.api.get<AiUsage>(`/projects/${projectId}/design/ai-usage`);
   }
 }

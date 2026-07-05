@@ -380,3 +380,63 @@ export interface WPThemeUpsert {
   description?: string;
   lastUpdatedAt?: string;
 }
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+
+export type ReportType = 'WEEKLY' | 'MONTHLY';
+
+export interface ProjectReport {
+  id: string;
+  projectId: string;
+  type: ReportType;
+  period: string;
+  periodStart: string;
+  status: 'DRAFT' | 'READY' | 'SENT';
+  summary?: string;
+  blockers?: string;
+  highlights?: string;
+  nextSteps?: string;
+  auto: boolean;
+  sentTo?: string;
+  sentAt?: string;
+  sentByName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReportUpsert {
+  type: ReportType;
+  period: string;
+  periodStart: string;
+  status?: 'DRAFT' | 'READY' | 'SENT';
+  summary?: string;
+  blockers?: string;
+  highlights?: string;
+  nextSteps?: string;
+}
+
+// ── AI image generation ───────────────────────────────────────────────────────
+
+export interface AiUsageEvent {
+  id: string;
+  provider: string;
+  operation: string;
+  userName?: string;
+  prompt?: string;
+  costUsd: number;
+  success: boolean;
+  createdAt: string;
+}
+
+export interface AiUsage {
+  recent: AiUsageEvent[];
+  month: { count: number; costUsd: number };
+  total: { count: number; costUsd: number };
+}
+
+export interface AiImageResult {
+  image: string;
+  revisedPrompt: string | null;
+  costUsd: number;
+  asset: DesignAsset | null;
+}

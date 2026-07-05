@@ -1,6 +1,8 @@
 import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder } from '@angular/forms';
 import { ProjectStateService } from '../../../services/project-state.service';
+import { ProjectService } from '../../../services/project.service';
+import { ProjectReport } from '../../../models/project.models';
 import { Badge } from '../../../ui';
 
 type ReportTab = 'weekly' | 'monthly' | 'history';
@@ -15,13 +17,6 @@ interface PastReport {
   sentBy: string;
 }
 
-const MOCK_HISTORY: PastReport[] = [
-  { id: '1', type: 'weekly',  period: 'Week of 2 Jun – 8 Jun 2025',   status: 'sent', sentAt: '9 Jun 2025',   sentBy: 'A. Khan' },
-  { id: '2', type: 'monthly', period: 'May 2025',                      status: 'sent', sentAt: '1 Jun 2025',   sentBy: 'A. Khan' },
-  { id: '3', type: 'weekly',  period: 'Week of 26 May – 1 Jun 2025',   status: 'sent', sentAt: '2 Jun 2025',   sentBy: 'A. Khan' },
-  { id: '4', type: 'weekly',  period: 'Week of 19 May – 25 May 2025',  status: 'sent', sentAt: '26 May 2025',  sentBy: 'A. Khan' },
-  { id: '5', type: 'monthly', period: 'April 2025',                    status: 'sent', sentAt: '1 May 2025',   sentBy: 'A. Khan' },
-];
 
 @Component({
   selector: 'app-reporting-tab',
@@ -165,9 +160,12 @@ const MOCK_HISTORY: PastReport[] = [
                 </button>
               }
               @if (weeklyStatus() === 'ready') {
-                <button class="btn-send" (click)="markWeeklySent()">
+                <input class="send-input" type="text" placeholder="client@example.com, manager@example.com"
+                  [value]="weeklyRecipients()" (input)="weeklyRecipients.set($any($event.target).value)"
+                  aria-label="Recipient email addresses, comma separated" />
+                <button class="btn-send" (click)="sendWeekly()" [disabled]="sendingWeekly()">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                  Mark as Sent
+                  @if (sendingWeekly()) { Sending… } @else { Send by Email }
                 </button>
               }
               @if (weeklyStatus() === 'sent') {
@@ -175,7 +173,11 @@ const MOCK_HISTORY: PastReport[] = [
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
                   Sent — added to history
                 </span>
+                @if (weeklyPreviewUrl(); as url) {
+                  <a class="preview-link" [href]="url" target="_blank" rel="noopener noreferrer">View sent email</a>
+                }
               }
+              @if (sendError()) { <span class="send-error" role="alert">{{ sendError() }}</span> }
             </div>
             <div class="footer-right">
               <button class="btn-outline" (click)="copyLink()" [attr.aria-label]="copying() ? 'Link copied' : 'Copy link to report'">
@@ -327,9 +329,12 @@ const MOCK_HISTORY: PastReport[] = [
                 </button>
               }
               @if (monthlyStatus() === 'ready') {
-                <button class="btn-send" (click)="markMonthlySent()">
+                <input class="send-input" type="text" placeholder="client@example.com, manager@example.com"
+                  [value]="monthlyRecipients()" (input)="monthlyRecipients.set($any($event.target).value)"
+                  aria-label="Recipient email addresses, comma separated" />
+                <button class="btn-send" (click)="sendMonthly()" [disabled]="sendingMonthly()">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                  Mark as Sent
+                  @if (sendingMonthly()) { Sending… } @else { Send by Email }
                 </button>
               }
               @if (monthlyStatus() === 'sent') {
@@ -337,7 +342,11 @@ const MOCK_HISTORY: PastReport[] = [
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
                   Sent — added to history
                 </span>
+                @if (monthlyPreviewUrl(); as url) {
+                  <a class="preview-link" [href]="url" target="_blank" rel="noopener noreferrer">View sent email</a>
+                }
               }
+              @if (sendError()) { <span class="send-error" role="alert">{{ sendError() }}</span> }
             </div>
             <div class="footer-right">
               <button class="btn-outline" (click)="copyLink()" [attr.aria-label]="copying() ? 'Link copied' : 'Copy link to report'">
@@ -858,6 +867,17 @@ const MOCK_HISTORY: PastReport[] = [
     }
     .hist-btn:hover { background: var(--color-surface-raised); color: var(--color-text); }
 
+    .send-input {
+      height: 34px; min-width: 260px; padding: 0 12px;
+      border: 1px solid var(--color-border); border-radius: 8px;
+      font-family: var(--font-sans); font-size: 12.5px; color: var(--color-text);
+      background: var(--color-surface); outline: none;
+    }
+    .send-input:focus { border-color: #6366F1; }
+    .preview-link { font-size: 12px; font-weight: 500; color: #6366F1; text-decoration: none; }
+    .preview-link:hover { text-decoration: underline; }
+    .send-error { font-size: 12px; color: #DC2626; font-weight: 500; }
+
     @media (max-width: 900px) {
       .stats-strip { grid-template-columns: repeat(2, 1fr); }
       .form-row-2  { grid-template-columns: 1fr; }
@@ -873,7 +893,12 @@ const MOCK_HISTORY: PastReport[] = [
 })
 export class ReportingTab implements OnInit {
   protected state = inject(ProjectStateService);
+  private projectService = inject(ProjectService);
   private fb = inject(FormBuilder);
+
+  private get projectId(): string {
+    return this.state.project()?.id ?? '';
+  }
 
   protected weekLabel = this.computeWeekLabel();
   protected monthLabel = this.computeMonthLabel();
@@ -883,7 +908,17 @@ export class ReportingTab implements OnInit {
   protected weeklyStatus = signal<ReportStatus>('draft');
   protected monthlyStatus = signal<ReportStatus>('draft');
   protected copying = signal(false);
-  protected history = signal<PastReport[]>(MOCK_HISTORY);
+  protected history = signal<PastReport[]>([]);
+
+  protected weeklyRecipients  = signal('');
+  protected monthlyRecipients = signal('');
+  protected sendingWeekly     = signal(false);
+  protected sendingMonthly    = signal(false);
+  protected weeklyPreviewUrl  = signal<string | null>(null);
+  protected monthlyPreviewUrl = signal<string | null>(null);
+  protected sendError         = signal<string | null>(null);
+  private weeklyReportId: string | null = null;
+  private monthlyReportId: string | null = null;
 
   protected weeklyForm = this.fb.nonNullable.group({
     summary:  [''],
@@ -962,6 +997,84 @@ export class ReportingTab implements OnInit {
   ngOnInit() {
     this.weeklyForm.patchValue({ summary: this.autoWeeklySummary() });
     this.monthlyForm.patchValue({ summary: this.autoMonthlySummary() });
+    this.loadReports();
+  }
+
+  private mondayDate(): Date {
+    const now = new Date();
+    const day = now.getDay();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+  }
+
+  private firstOfMonthDate(): Date {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+
+  private sameLocalDay(iso: string, d: Date): boolean {
+    const a = new Date(iso);
+    return a.getFullYear() === d.getFullYear() && a.getMonth() === d.getMonth() && a.getDate() === d.getDate();
+  }
+
+  private loadReports() {
+    const pid = this.projectId;
+    if (!pid) return;
+    this.projectService.getReports(pid).subscribe({
+      next: (reports) => {
+        this.history.set(reports.filter(r => r.status === 'SENT').map(r => ({
+          id: r.id,
+          type: (r.type === 'WEEKLY' ? 'weekly' : 'monthly') as 'weekly' | 'monthly',
+          period: r.period,
+          status: 'sent' as ReportStatus,
+          sentAt: r.sentAt ? new Date(r.sentAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—',
+          sentBy: r.sentByName ?? '—',
+        })));
+
+        const wk = reports.find(r => r.type === 'WEEKLY' && this.sameLocalDay(r.periodStart, this.mondayDate()));
+        if (wk) {
+          this.weeklyReportId = wk.id;
+          this.weeklyStatus.set(wk.status.toLowerCase() as ReportStatus);
+          this.weeklyForm.patchValue({
+            summary:  wk.summary   ?? this.autoWeeklySummary(),
+            blockers: wk.blockers  ?? '',
+            nextPlan: wk.nextSteps ?? '',
+          });
+        }
+        const mo = reports.find(r => r.type === 'MONTHLY' && this.sameLocalDay(r.periodStart, this.firstOfMonthDate()));
+        if (mo) {
+          this.monthlyReportId = mo.id;
+          this.monthlyStatus.set(mo.status.toLowerCase() as ReportStatus);
+          this.monthlyForm.patchValue({
+            summary:    mo.summary    ?? this.autoMonthlySummary(),
+            highlights: mo.highlights ?? '',
+            nextGoals:  mo.nextSteps  ?? '',
+          });
+        }
+      },
+      error: () => { /* reports are supplementary; page still works without them */ },
+    });
+  }
+
+  private saveReport(type: 'weekly' | 'monthly', status: 'DRAFT' | 'READY') {
+    if (type === 'weekly') {
+      const v = this.weeklyForm.getRawValue();
+      return this.projectService.upsertReport(this.projectId, {
+        type: 'WEEKLY', period: this.weekLabel, periodStart: this.mondayDate().toISOString(),
+        status, summary: v.summary, blockers: v.blockers, nextSteps: v.nextPlan,
+      });
+    }
+    const v = this.monthlyForm.getRawValue();
+    return this.projectService.upsertReport(this.projectId, {
+      type: 'MONTHLY', period: this.monthLabel, periodStart: this.firstOfMonthDate().toISOString(),
+      status, summary: v.summary, highlights: v.highlights, nextSteps: v.nextGoals,
+    });
+  }
+
+  private parseRecipients(raw: string): string[] {
+    return raw.split(/[,;\s]+/).map(s => s.trim()).filter(s => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s));
   }
 
   protected autoFillWeekly() {
@@ -972,29 +1085,80 @@ export class ReportingTab implements OnInit {
     this.monthlyForm.patchValue({ summary: this.autoMonthlySummary() });
   }
 
-  protected markWeeklyReady()   { this.weeklyStatus.set('ready'); }
-  protected markMonthlyReady()  { this.monthlyStatus.set('ready'); }
-
-  protected markWeeklySent() {
-    this.weeklyStatus.set('sent');
-    this.addToHistory('weekly', this.weekLabel);
+  protected markWeeklyReady() {
+    this.saveReport('weekly', 'READY').subscribe(r => {
+      this.weeklyReportId = r.id;
+      this.weeklyStatus.set('ready');
+    });
   }
 
-  protected markMonthlySent() {
-    this.monthlyStatus.set('sent');
-    this.addToHistory('monthly', this.monthLabel);
+  protected markMonthlyReady() {
+    this.saveReport('monthly', 'READY').subscribe(r => {
+      this.monthlyReportId = r.id;
+      this.monthlyStatus.set('ready');
+    });
   }
 
-  private addToHistory(type: 'weekly' | 'monthly', period: string) {
-    const now = new Date();
-    this.history.update(h => [{
-      id: now.getTime().toString(),
-      type,
-      period,
-      status: 'sent',
-      sentAt: now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-      sentBy: 'You',
-    }, ...h]);
+  protected sendWeekly() {
+    const to = this.parseRecipients(this.weeklyRecipients());
+    if (to.length === 0) {
+      this.sendError.set('Enter at least one valid email address.');
+      return;
+    }
+    this.sendError.set(null);
+    this.sendingWeekly.set(true);
+    this.saveReport('weekly', 'READY').subscribe({
+      next: (r) => {
+        this.weeklyReportId = r.id;
+        this.projectService.sendReport(this.projectId, r.id, to).subscribe({
+          next: (res) => {
+            this.sendingWeekly.set(false);
+            this.weeklyStatus.set('sent');
+            this.weeklyPreviewUrl.set(res.previewUrl ?? null);
+            this.loadReports();
+          },
+          error: () => {
+            this.sendingWeekly.set(false);
+            this.sendError.set('Sending failed. Please try again.');
+          },
+        });
+      },
+      error: () => {
+        this.sendingWeekly.set(false);
+        this.sendError.set('Could not save the report before sending.');
+      },
+    });
+  }
+
+  protected sendMonthly() {
+    const to = this.parseRecipients(this.monthlyRecipients());
+    if (to.length === 0) {
+      this.sendError.set('Enter at least one valid email address.');
+      return;
+    }
+    this.sendError.set(null);
+    this.sendingMonthly.set(true);
+    this.saveReport('monthly', 'READY').subscribe({
+      next: (r) => {
+        this.monthlyReportId = r.id;
+        this.projectService.sendReport(this.projectId, r.id, to).subscribe({
+          next: (res) => {
+            this.sendingMonthly.set(false);
+            this.monthlyStatus.set('sent');
+            this.monthlyPreviewUrl.set(res.previewUrl ?? null);
+            this.loadReports();
+          },
+          error: () => {
+            this.sendingMonthly.set(false);
+            this.sendError.set('Sending failed. Please try again.');
+          },
+        });
+      },
+      error: () => {
+        this.sendingMonthly.set(false);
+        this.sendError.set('Could not save the report before sending.');
+      },
+    });
   }
 
   protected async copyLink() {
