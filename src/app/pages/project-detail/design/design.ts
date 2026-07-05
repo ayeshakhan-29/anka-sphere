@@ -1,13 +1,16 @@
 import { Component, signal, computed, inject, OnInit } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ActivatedRoute } from '@angular/router';
 import { Badge } from '../../../ui';
 import { ProjectService } from '../../../services/project.service';
 import { ProjectStateService } from '../../../services/project-state.service';
 import { AuthService } from '../../../services/auth.service';
 import { NotificationService } from '../../../services/notification.service';
+import { AiUsage, AiImageResult } from '../../../models/project.models';
 
-type TabId = 'brief' | 'kanban' | 'assets' | 'gate';
+type TabId = 'brief' | 'kanban' | 'assets' | 'ai' | 'gate';
 type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE';
 type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH';
 type AssetType = 'IMAGE' | 'VIDEO' | 'FONT' | 'DOCUMENT' | 'OTHER';
@@ -103,6 +106,11 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
                   </a>
                 }
               </div>
+              @if (figmaEmbed(); as embed) {
+                <div class="field span-full figma-embed-wrap">
+                  <iframe class="figma-embed" [src]="embed" title="Figma design preview" loading="lazy" allowfullscreen></iframe>
+                </div>
+              }
             </div>
             <div class="form-actions">
               <button class="btn-save" type="button" (click)="saveBrief()">Save Brief</button>
@@ -313,6 +321,71 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
           </section>
         }
 
+        <!-- AI Images tab -->
+        @if (activeTab() === 'ai') {
+          <section aria-label="AI image generation" class="ai-panel">
+            <div class="ai-gen-card">
+              <label class="field-label" for="ai-prompt">Describe the image you need</label>
+              <textarea id="ai-prompt" class="field-textarea" rows="3"
+                placeholder="e.g. Minimalist hero illustration of fresh vegetables on a pastel green background, soft studio lighting"
+                [value]="aiPrompt()" (input)="aiPrompt.set($any($event.target).value)"
+                [disabled]="aiGenerating()"></textarea>
+              <div class="ai-controls">
+                <select class="ai-size-select" [value]="aiSize()" (change)="aiSize.set($any($event.target).value)"
+                  aria-label="Image size" [disabled]="aiGenerating()">
+                  <option value="1024x1024">Square · 1024×1024 ($0.04)</option>
+                  <option value="1792x1024">Landscape · 1792×1024 ($0.08)</option>
+                  <option value="1024x1792">Portrait · 1024×1792 ($0.08)</option>
+                </select>
+                <button class="btn-save" type="button" (click)="generateImage()"
+                  [disabled]="aiGenerating() || aiPrompt().trim().length < 3">
+                  @if (aiGenerating()) { Generating… } @else { Generate with DALL·E 3 }
+                </button>
+              </div>
+              @if (aiError()) { <div class="ai-error" role="alert">{{ aiError() }}</div> }
+            </div>
+
+            @if (aiResult(); as result) {
+              <div class="ai-result-card">
+                <img class="ai-result-img" [src]="result.image" alt="AI-generated image for prompt: {{ aiPrompt() }}" />
+                @if (result.revisedPrompt) {
+                  <p class="ai-revised">DALL·E interpreted your prompt as: “{{ result.revisedPrompt }}”</p>
+                }
+                <div class="ai-result-actions">
+                  @if (aiSaved()) {
+                    <span class="ai-saved-ok" role="status">✓ Saved to asset library</span>
+                  } @else {
+                    <button class="btn-save" type="button" (click)="saveAiImageToAssets()">Save to Assets</button>
+                  }
+                </div>
+              </div>
+            }
+
+            <!-- API usage tracker -->
+            @if (aiUsage(); as usage) {
+              <div class="ai-usage-card">
+                <h3 class="ai-usage-title">API Usage Tracker</h3>
+                <div class="ai-usage-stats">
+                  <div class="usage-stat"><span class="usage-val">{{ usage.month.count }}</span><span class="usage-lbl">images this month</span></div>
+                  <div class="usage-stat"><span class="usage-val">{{ '$' + usage.month.costUsd.toFixed(2) }}</span><span class="usage-lbl">cost this month</span></div>
+                  <div class="usage-stat"><span class="usage-val">{{ usage.total.count }}</span><span class="usage-lbl">images all-time</span></div>
+                  <div class="usage-stat"><span class="usage-val">{{ '$' + usage.total.costUsd.toFixed(2) }}</span><span class="usage-lbl">cost all-time</span></div>
+                </div>
+                @if (usage.recent.length > 0) {
+                  <div class="usage-list" role="list" aria-label="Recent generations for this project">
+                    @for (ev of usage.recent; track ev.id) {
+                      <div class="usage-row" role="listitem">
+                        <span class="usage-prompt">{{ ev.prompt }}</span>
+                        <span class="usage-meta">{{ ev.userName ?? '—' }} · {{ ev.success ? ('$' + ev.costUsd.toFixed(2)) : 'failed' }}</span>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </section>
+        }
+
         <!-- Gate tab -->
         @if (activeTab() === 'gate') {
           <section aria-label="Soft Gate">
@@ -466,6 +539,28 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
       color: var(--color-info); text-decoration: none;
     }
     .figma-link:hover { text-decoration: underline; }
+    .figma-embed-wrap { border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; background: var(--color-surface-raised); }
+    .figma-embed { display: block; width: 100%; height: 480px; border: none; }
+
+    /* AI Images */
+    .ai-panel { display: flex; flex-direction: column; gap: 16px; }
+    .ai-gen-card, .ai-result-card, .ai-usage-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+    .ai-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .ai-size-select { height: 36px; padding: 0 10px; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 13px; color: var(--color-text); background: var(--color-surface); cursor: pointer; }
+    .ai-error { font-size: 12.5px; color: #DC2626; background: #FEF2F2; border: 1px solid #FECACA; border-radius: var(--radius-md); padding: 8px 12px; }
+    .ai-result-img { max-width: 100%; max-height: 480px; object-fit: contain; border-radius: var(--radius-md); border: 1px solid var(--color-border); align-self: flex-start; }
+    .ai-revised { font-size: 12px; color: var(--color-text-muted); font-style: italic; margin: 0; }
+    .ai-result-actions { display: flex; align-items: center; gap: 10px; }
+    .ai-saved-ok { font-size: 12.5px; font-weight: 600; color: #16A34A; }
+    .ai-usage-title { font-size: 13px; font-weight: 600; color: var(--color-text); margin: 0; }
+    .ai-usage-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+    .usage-stat { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; background: var(--color-surface-raised); border-radius: var(--radius-md); }
+    .usage-val { font-size: 17px; font-weight: 700; color: var(--color-text); }
+    .usage-lbl { font-size: 11px; color: var(--color-text-muted); }
+    .usage-list { display: flex; flex-direction: column; gap: 4px; }
+    .usage-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 7px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+    .usage-prompt { font-size: 12px; color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .usage-meta { font-size: 11px; color: var(--color-text-muted); white-space: nowrap; }
     .form-actions { display: flex; justify-content: flex-end; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--color-border); }
     .btn-save { height: 36px; padding: 0 20px; background: var(--color-accent); color: #fff; border: none; border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
     .btn-save:hover { background: var(--color-accent-hover); }
@@ -612,6 +707,7 @@ export class DesignModule implements OnInit {
     { id: 'brief'  as TabId, label: 'Design Brief', badge: () => null },
     { id: 'kanban' as TabId, label: 'Kanban',       badge: () => this.tasks().length > 0 ? this.tasks().length : null },
     { id: 'assets' as TabId, label: 'Assets',       badge: () => this.assets().length > 0 ? this.assets().length : null },
+    { id: 'ai'     as TabId, label: 'AI Images',    badge: () => null },
     { id: 'gate'   as TabId, label: 'Soft Gate',    badge: () => null },
   ];
 
@@ -622,6 +718,70 @@ export class DesignModule implements OnInit {
     styleGuide: [''],
     figmaUrl:   [''],
   });
+
+  private sanitizer = inject(DomSanitizer);
+  private figmaUrlValue = toSignal(this.briefForm.controls.figmaUrl.valueChanges, {
+    initialValue: this.briefForm.controls.figmaUrl.value,
+  });
+  protected figmaEmbed = computed<SafeResourceUrl | null>(() => {
+    const raw = (this.figmaUrlValue() ?? '').trim();
+    if (!/^https:\/\/([\w-]+\.)?figma\.com\/(file|design|proto|board)\//.test(raw)) return null;
+    return this.sanitizer.bypassSecurityTrustResourceUrl(
+      `https://www.figma.com/embed?embed_host=anka-sphere&url=${encodeURIComponent(raw)}`
+    );
+  });
+
+  // ── AI image generation ────────────────────────────────────────────────────
+  protected aiPrompt     = signal('');
+  protected aiSize       = signal<'1024x1024' | '1792x1024' | '1024x1792'>('1024x1024');
+  protected aiGenerating = signal(false);
+  protected aiError      = signal<string | null>(null);
+  protected aiResult     = signal<AiImageResult | null>(null);
+  protected aiSaved      = signal(false);
+  protected aiUsage      = signal<AiUsage | null>(null);
+
+  protected generateImage(): void {
+    this.aiError.set(null);
+    this.aiSaved.set(false);
+    this.aiGenerating.set(true);
+    this.projectService.generateAiImage(this.projectId, {
+      prompt: this.aiPrompt().trim(),
+      size: this.aiSize(),
+    }).subscribe({
+      next: (res) => {
+        this.aiResult.set(res);
+        this.aiGenerating.set(false);
+        this.loadAiUsage();
+      },
+      error: (err) => {
+        this.aiError.set(err?.error?.error ?? 'Image generation failed. Please try again.');
+        this.aiGenerating.set(false);
+        this.loadAiUsage();
+      },
+    });
+  }
+
+  protected saveAiImageToAssets(): void {
+    const result = this.aiResult();
+    if (!result) return;
+    this.projectService.createDesignAsset(this.projectId, {
+      name: `AI · ${this.aiPrompt().trim().slice(0, 60)}`,
+      type: 'IMAGE' as AssetType,
+      url: result.image,
+      notes: `AI-generated (DALL·E 3). Prompt: ${this.aiPrompt().trim().slice(0, 300)}`,
+      version: 1,
+    }).subscribe((a) => {
+      this.assets.update(list => [...list, { id: a.id, name: a.name, type: a.type as AssetType, url: a.url, thumbnailUrl: '', version: a.version, notes: a.notes ?? '', approvedAt: a.approvedAt ?? null }]);
+      this.aiSaved.set(true);
+    });
+  }
+
+  private loadAiUsage(): void {
+    this.projectService.getAiUsage(this.projectId).subscribe({
+      next: (u) => this.aiUsage.set(u),
+      error: () => { /* usage panel is non-critical */ },
+    });
+  }
 
   protected tasks = signal<DesignTask[]>([]);
   protected assets = signal<DesignAsset[]>([]);
@@ -684,6 +844,7 @@ export class DesignModule implements OnInit {
         notes: a.notes ?? '', approvedAt: a.approvedAt ?? null,
       })));
     }
+    this.loadAiUsage();
   }
 
   protected addTask() {
