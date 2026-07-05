@@ -334,12 +334,12 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
                 <select class="ai-size-select" [value]="aiSize()" (change)="aiSize.set($any($event.target).value)"
                   aria-label="Image size" [disabled]="aiGenerating()">
                   <option value="1024x1024">Square · 1024×1024 ($0.04)</option>
-                  <option value="1792x1024">Landscape · 1792×1024 ($0.08)</option>
-                  <option value="1024x1792">Portrait · 1024×1792 ($0.08)</option>
+                  <option value="1536x1024">Landscape · 1536×1024 ($0.06)</option>
+                  <option value="1024x1536">Portrait · 1024×1536 ($0.06)</option>
                 </select>
                 <button class="btn-save" type="button" (click)="generateImage()"
                   [disabled]="aiGenerating() || aiPrompt().trim().length < 3">
-                  @if (aiGenerating()) { Generating… } @else { Generate with DALL·E 3 }
+                  @if (aiGenerating()) { Generating… } @else { Generate Image }
                 </button>
               </div>
               @if (aiError()) { <div class="ai-error" role="alert">{{ aiError() }}</div> }
@@ -733,7 +733,7 @@ export class DesignModule implements OnInit {
 
   // ── AI image generation ────────────────────────────────────────────────────
   protected aiPrompt     = signal('');
-  protected aiSize       = signal<'1024x1024' | '1792x1024' | '1024x1792'>('1024x1024');
+  protected aiSize       = signal<'1024x1024' | '1536x1024' | '1024x1536'>('1024x1024');
   protected aiGenerating = signal(false);
   protected aiError      = signal<string | null>(null);
   protected aiResult     = signal<AiImageResult | null>(null);
@@ -768,7 +768,7 @@ export class DesignModule implements OnInit {
       name: `AI · ${this.aiPrompt().trim().slice(0, 60)}`,
       type: 'IMAGE' as AssetType,
       url: result.image,
-      notes: `AI-generated (DALL·E 3). Prompt: ${this.aiPrompt().trim().slice(0, 300)}`,
+      notes: `AI-generated. Prompt: ${this.aiPrompt().trim().slice(0, 300)}`,
       version: 1,
     }).subscribe((a) => {
       this.assets.update(list => [...list, { id: a.id, name: a.name, type: a.type as AssetType, url: a.url, thumbnailUrl: '', version: a.version, notes: a.notes ?? '', approvedAt: a.approvedAt ?? null }]);
