@@ -45,5 +45,6 @@ export const routes: Routes = [
       { path: 'settings',         loadComponent: () => import('./pages/settings/settings').then(m => m.Settings) },
     ],
   },
-  { path: '**', redirectTo: '/login' },
+  // Unknown URLs go to the app (auth guard sends logged-out users to /login)
+  { path: '**', redirectTo: '/app/projects' },
 ];

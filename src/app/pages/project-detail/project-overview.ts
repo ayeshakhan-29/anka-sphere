@@ -93,7 +93,7 @@ const STAGE_ROUTES: Record<string, string> = {
                       {{ stage.gate === 'hard' ? 'Hard Gate' : stage.gate === 'soft' ? 'Soft Gate' : 'No Gate' }}
                     </span>
                     @if (stage.status !== 'locked') {
-                      <a class="stage-link" [routerLink]="stageRoute(stage.stage)" [attr.aria-label]="'Open ' + stage.label">Open →</a>
+                      <a class="stage-link" [routerLink]="['..', stageRoute(stage.stage)]" [attr.aria-label]="'Open ' + stage.label">Open →</a>
                     }
                   </div>
                 </li>
