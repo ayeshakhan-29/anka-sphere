@@ -15,7 +15,7 @@ type CategoryFilter = 'ALL' | MarketingTaskCategory;
 const COL_LABELS: Record<KanbanCol, string> = {
   TODO: 'To Do', IN_PROGRESS: 'In Progress', IN_REVIEW: 'In Review', DONE: 'Done',
 };
-const CAT_COLORS: Record<string, string> = {
+const CAT_COLORS: Partial<Record<string, string>> = {
   CONTENT: '#F59E0B', SOCIAL: '#EC4899', PAID: '#EF4444',
   SEO: '#10B981', ANALYTICS: '#6366F1', OTHER: '#6B7280',
 };
