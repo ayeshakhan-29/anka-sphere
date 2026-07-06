@@ -2,10 +2,10 @@ import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder } from '@angular/forms';
 import { ProjectStateService } from '../../../services/project-state.service';
 import { ProjectService } from '../../../services/project.service';
-import { ProjectReport } from '../../../models/project.models';
+import { EmailDeliveryProfile, EmailDeliveryProvider, ProjectReport } from '../../../models/project.models';
 import { Badge } from '../../../ui';
 
-type ReportTab = 'weekly' | 'monthly' | 'history';
+type ReportTab = 'weekly' | 'monthly' | 'history' | 'delivery';
 type ReportStatus = 'draft' | 'ready' | 'sent';
 
 interface PastReport {
@@ -431,6 +431,97 @@ interface PastReport {
                 </div>
               }
             </div>
+          }
+        </section>
+      }
+
+      <!-- Email Delivery -->
+      @if (activeTab() === 'delivery') {
+        <section class="tab-panel" aria-label="Email delivery setup">
+          <div class="delivery-header">
+            <div>
+              <h3 class="history-title">Custom Email Delivery</h3>
+              <p class="history-sub">Send this project's reports and notifications from a branded domain.</p>
+            </div>
+            <span class="delivery-status" [class.delivery-status--active]="emailDelivery()?.settings?.status === 'ACTIVE'">
+              {{ deliveryStatusLabel() }}
+            </span>
+          </div>
+
+          @if (deliveryLoading()) {
+            <div class="empty-history" role="status"><p>Loading email delivery setup...</p></div>
+          } @else {
+            <form [formGroup]="emailDeliveryForm" class="delivery-form" aria-label="Email delivery settings">
+              <div class="form-row-2">
+                <div class="report-field">
+                  <label class="field-label" for="mail-provider">Mail provider</label>
+                  <select id="mail-provider" class="delivery-input" formControlName="provider">
+                    @for (provider of providerOptions; track provider.value) {
+                      <option [value]="provider.value">{{ provider.label }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="report-field">
+                  <label class="field-label" for="mail-domain">Sending domain</label>
+                  <input id="mail-domain" class="delivery-input" type="text" formControlName="domain" placeholder="anka.agency" />
+                </div>
+              </div>
+
+              <div class="form-row-2">
+                <div class="report-field">
+                  <label class="field-label" for="mail-from-name">From name</label>
+                  <input id="mail-from-name" class="delivery-input" type="text" formControlName="fromName" placeholder="Anka Reports" />
+                </div>
+                <div class="report-field">
+                  <label class="field-label" for="mail-from-local">From email prefix</label>
+                  <div class="from-row">
+                    <input id="mail-from-local" class="delivery-input" type="text" formControlName="fromLocalPart" placeholder="reports" />
+                    <span class="from-preview">{{ deliveryFromPreview() }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="report-field">
+                <label class="field-label" for="mail-reply-to">Reply-to email</label>
+                <input id="mail-reply-to" class="delivery-input" type="email" formControlName="replyToEmail" placeholder="support@anka.agency" />
+              </div>
+
+              <div class="delivery-actions">
+                <button type="button" class="btn-primary-sm" (click)="saveEmailDelivery()" [disabled]="deliverySaving()">
+                  @if (deliverySaving()) { Saving... } @else { Generate DNS Records }
+                </button>
+                <button type="button" class="btn-outline" (click)="markDeliveryConfigured()" [disabled]="!emailDelivery()?.settings || emailDelivery()?.settings?.status === 'ACTIVE' || deliveryVerifying()">
+                  @if (deliveryVerifying()) { Activating... } @else { Mark DNS Configured }
+                </button>
+                @if (deliveryMessage()) { <span class="delivery-message" role="status">{{ deliveryMessage() }}</span> }
+                @if (deliveryError()) { <span class="send-error" role="alert">{{ deliveryError() }}</span> }
+              </div>
+            </form>
+
+            @if (deliveryRecords().length > 0) {
+              <div class="dns-card">
+                <div class="section-card-header">
+                  <span class="section-card-title">DNS Records</span>
+                  <span class="section-card-meta">About {{ emailDelivery()?.estimatedSetupMinutes ?? 10 }} min</span>
+                </div>
+                <div class="dns-table" role="table" aria-label="DNS records for email delivery">
+                  <div class="dns-head" role="row">
+                    <span role="columnheader">Type</span>
+                    <span role="columnheader">Host</span>
+                    <span role="columnheader">Value</span>
+                    <span role="columnheader">Purpose</span>
+                  </div>
+                  @for (record of deliveryRecords(); track record.type + record.host + record.value) {
+                    <div class="dns-row" role="row">
+                      <span role="cell"><span class="dns-type">{{ record.type }}</span></span>
+                      <code role="cell">{{ record.host }}</code>
+                      <code role="cell" class="dns-value">{{ record.priority ? record.priority + ' ' : '' }}{{ record.value }}</code>
+                      <span role="cell">{{ record.purpose }} @if (record.required) { <span class="required-dot">Required</span> }</span>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
           }
         </section>
       }
@@ -881,6 +972,120 @@ interface PastReport {
     }
     .hist-btn:hover { background: var(--color-surface-raised); color: var(--color-text); }
 
+
+    .delivery-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .delivery-status {
+      display: inline-flex;
+      align-items: center;
+      height: 28px;
+      padding: 0 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(234,179,8,0.35);
+      background: rgba(234,179,8,0.1);
+      color: #A16207;
+      font-size: 11.5px;
+      font-weight: 700;
+    }
+    .delivery-status--active {
+      border-color: rgba(22,163,74,0.3);
+      background: rgba(22,163,74,0.1);
+      color: #15803D;
+    }
+    .delivery-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 18px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      background: var(--color-surface);
+    }
+    .delivery-input {
+      width: 100%;
+      height: 36px;
+      padding: 0 12px;
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      background: var(--color-surface);
+      color: var(--color-text);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .delivery-input:focus { border-color: #6366F1; }
+    .from-row { display: grid; grid-template-columns: minmax(120px, 180px) 1fr; gap: 10px; align-items: center; }
+    .from-preview {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--color-text-muted);
+      font-size: 12.5px;
+    }
+    .delivery-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .delivery-message { font-size: 12px; color: #15803D; font-weight: 600; }
+    .dns-card {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      background: var(--color-surface);
+      overflow: hidden;
+    }
+    .dns-table { display: flex; flex-direction: column; }
+    .dns-head, .dns-row {
+      display: grid;
+      grid-template-columns: 70px 150px minmax(240px, 1fr) 160px;
+      gap: 12px;
+      align-items: center;
+    }
+    .dns-head {
+      padding: 10px 18px;
+      background: var(--color-surface-raised);
+      color: var(--color-text-muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .dns-row {
+      padding: 12px 18px;
+      border-top: 1px solid var(--color-border);
+      color: var(--color-text-secondary);
+      font-size: 12.5px;
+    }
+    .dns-row code {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: var(--color-text);
+      background: var(--color-surface-raised);
+      border-radius: 6px;
+      padding: 5px 7px;
+    }
+    .dns-type {
+      display: inline-flex;
+      height: 24px;
+      align-items: center;
+      padding: 0 8px;
+      border-radius: 8px;
+      background: rgba(99,102,241,0.1);
+      color: #4F46E5;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .required-dot {
+      display: inline-flex;
+      margin-left: 6px;
+      color: #DC2626;
+      font-size: 11px;
+      font-weight: 700;
+    }
     .send-input {
       height: 34px; min-width: 260px; padding: 0 12px;
       border: 1px solid var(--color-border); border-radius: 8px;
@@ -904,6 +1109,9 @@ interface PastReport {
       .history-head span:nth-child(n+4),
       .history-row span:nth-child(n+4) { display: none; }
       .history-row span:nth-child(6) { display: flex; }
+      .from-row { grid-template-columns: 1fr; }
+      .dns-head { display: none; }
+      .dns-row { grid-template-columns: 1fr; gap: 8px; }
     }
   `]
 })
@@ -935,6 +1143,12 @@ export class ReportingTab implements OnInit {
   protected sendError         = signal<string | null>(null);
   protected aiDrafting        = signal(false);
   protected aiDraftError      = signal<string | null>(null);
+  protected emailDelivery     = signal<EmailDeliveryProfile | null>(null);
+  protected deliveryLoading   = signal(false);
+  protected deliverySaving    = signal(false);
+  protected deliveryVerifying = signal(false);
+  protected deliveryMessage   = signal<string | null>(null);
+  protected deliveryError     = signal<string | null>(null);
   private weeklyReportId: string | null = null;
   private monthlyReportId: string | null = null;
 
@@ -950,11 +1164,45 @@ export class ReportingTab implements OnInit {
     nextGoals:  [''],
   });
 
+  protected emailDeliveryForm = this.fb.nonNullable.group({
+    provider: ['RESEND' as EmailDeliveryProvider],
+    domain: [''],
+    fromName: [''],
+    fromLocalPart: ['reports'],
+    replyToEmail: [''],
+  });
   protected readonly tabs = [
     { id: 'weekly'  as ReportTab, label: 'Weekly Report' },
     { id: 'monthly' as ReportTab, label: 'Monthly Report' },
     { id: 'history' as ReportTab, label: 'History' },
+    { id: 'delivery' as ReportTab, label: 'Email Delivery' },
   ];
+
+
+  protected readonly providerOptions: { value: EmailDeliveryProvider; label: string }[] = [
+    { value: 'RESEND', label: 'Resend' },
+    { value: 'POSTMARK', label: 'Postmark' },
+    { value: 'SENDGRID', label: 'SendGrid' },
+    { value: 'MAILGUN', label: 'Mailgun' },
+    { value: 'CUSTOM_SMTP', label: 'Custom SMTP' },
+  ];
+
+  protected deliveryRecords = computed(() => this.emailDelivery()?.dnsRecords ?? []);
+
+  protected deliveryStatusLabel = computed(() => {
+    const status = this.emailDelivery()?.settings?.status;
+    if (status === 'ACTIVE') return 'Active';
+    if (status === 'PENDING_DNS') return 'Pending DNS';
+    return 'Not configured';
+  });
+
+  protected deliveryFromPreview = computed(() => {
+    const settings = this.emailDelivery()?.settings;
+    if (settings) return settings.fromEmail;
+    const form = this.emailDeliveryForm.getRawValue();
+    const domain = form.domain.trim();
+    return domain ? `${form.fromLocalPart || 'reports'}@${domain}` : 'reports@anka.agency';
+  });
 
   protected activeStageName = computed(() =>
     this.state.pipeline().find(s => s.status === 'active')?.label ?? '—'
@@ -1016,6 +1264,7 @@ export class ReportingTab implements OnInit {
     this.weeklyForm.patchValue({ summary: this.autoWeeklySummary() });
     this.monthlyForm.patchValue({ summary: this.autoMonthlySummary() });
     this.loadReports();
+    this.loadEmailDelivery();
   }
 
   private mondayDate(): Date {
@@ -1037,6 +1286,80 @@ export class ReportingTab implements OnInit {
     return a.getFullYear() === d.getFullYear() && a.getMonth() === d.getMonth() && a.getDate() === d.getDate();
   }
 
+  private loadEmailDelivery() {
+    const pid = this.projectId;
+    if (!pid) return;
+    this.deliveryLoading.set(true);
+    this.projectService.getEmailDelivery(pid).subscribe({
+      next: (profile) => {
+        this.emailDelivery.set(profile);
+        const settings = profile.settings;
+        if (settings) {
+          const [fromLocalPart] = settings.fromEmail.split('@');
+          this.emailDeliveryForm.patchValue({
+            provider: settings.provider,
+            domain: settings.domain,
+            fromName: settings.fromName,
+            fromLocalPart: fromLocalPart || 'reports',
+            replyToEmail: settings.replyToEmail ?? '',
+          });
+        } else {
+          const p = this.state.project();
+          this.emailDeliveryForm.patchValue({ fromName: p?.clientName ?? p?.name ?? 'Client Reports' });
+        }
+        this.deliveryLoading.set(false);
+      },
+      error: () => {
+        this.deliveryLoading.set(false);
+        this.deliveryError.set('Could not load email delivery settings.');
+      },
+    });
+  }
+
+  protected saveEmailDelivery() {
+    const pid = this.projectId;
+    if (!pid) return;
+    const value = this.emailDeliveryForm.getRawValue();
+    this.deliverySaving.set(true);
+    this.deliveryError.set(null);
+    this.deliveryMessage.set(null);
+    this.projectService.saveEmailDelivery(pid, {
+      provider: value.provider,
+      domain: value.domain,
+      fromName: value.fromName,
+      fromLocalPart: value.fromLocalPart,
+      replyToEmail: value.replyToEmail || undefined,
+    }).subscribe({
+      next: (profile) => {
+        this.emailDelivery.set(profile);
+        this.deliverySaving.set(false);
+        this.deliveryMessage.set('DNS records generated. Add them at your domain host, then mark DNS configured.');
+      },
+      error: (err) => {
+        this.deliverySaving.set(false);
+        this.deliveryError.set(err?.error?.error ?? 'Could not save email delivery settings.');
+      },
+    });
+  }
+
+  protected markDeliveryConfigured() {
+    const pid = this.projectId;
+    if (!pid) return;
+    this.deliveryVerifying.set(true);
+    this.deliveryError.set(null);
+    this.deliveryMessage.set(null);
+    this.projectService.markEmailDeliveryConfigured(pid).subscribe({
+      next: (profile) => {
+        this.emailDelivery.set(profile);
+        this.deliveryVerifying.set(false);
+        this.deliveryMessage.set('Email delivery is active for this project.');
+      },
+      error: (err) => {
+        this.deliveryVerifying.set(false);
+        this.deliveryError.set(err?.error?.error ?? 'Could not activate email delivery.');
+      },
+    });
+  }
   private loadReports() {
     const pid = this.projectId;
     if (!pid) return;

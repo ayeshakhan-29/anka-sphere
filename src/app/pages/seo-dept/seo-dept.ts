@@ -19,7 +19,10 @@ interface SeoProject {
   pagesTotal: number;
   completedAt?: string;
   daysActive: number;
+  searchConsoleUrl?: string;
 }
+
+const GSC_CREATE_URL = 'https://search.google.com/search-console/welcome';
 
 interface KeywordRow {
   keyword: string;
@@ -127,6 +130,7 @@ function splitKw(raw?: string): string[] {
             <span>On-Page</span>
             <span>Days Active</span>
             <span>Status</span>
+            <span>Search Console</span>
             <span></span>
           </div>
           <div class="proj-list" role="list" aria-label="SEO projects">
@@ -175,6 +179,15 @@ function splitKw(raw?: string): string[] {
                     <ui-badge variant="success">Complete</ui-badge>
                   } @else {
                     <ui-badge variant="success">Active</ui-badge>
+                  }
+                </div>
+                <div class="gsc-cell">
+                  @if (p.searchConsoleUrl) {
+                    <a class="conn conn--on" [href]="gscLink(p.searchConsoleUrl)" target="_blank" rel="noopener" [title]="p.searchConsoleUrl">
+                      <span class="conn-dot" aria-hidden="true"></span>Linked
+                    </a>
+                  } @else {
+                    <a class="conn conn--off" [href]="GSC_CREATE_URL" target="_blank" rel="noopener">Set up →</a>
                   }
                 </div>
                 <a class="btn-open" [routerLink]="['/app/projects', p.id, 'analytics']" aria-label="Open {{ p.name }}">Open</a>
@@ -376,9 +389,9 @@ function splitKw(raw?: string): string[] {
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* Projects tab */
-    .list-header { display: grid; grid-template-columns: 1fr 180px 120px 110px 80px 90px 70px; gap: 10px; padding: 0 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-muted); }
+    .list-header { display: grid; grid-template-columns: 1fr 180px 120px 110px 80px 90px 110px 70px; gap: 10px; padding: 0 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-muted); }
     .proj-list { display: flex; flex-direction: column; gap: 6px; }
-    .prow { display: grid; grid-template-columns: 1fr 180px 120px 110px 80px 90px 70px; gap: 10px; align-items: center; padding: 10px 14px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); transition: box-shadow 0.15s; }
+    .prow { display: grid; grid-template-columns: 1fr 180px 120px 110px 80px 90px 110px 70px; gap: 10px; align-items: center; padding: 10px 14px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); transition: box-shadow 0.15s; }
     .prow:hover { box-shadow: var(--shadow-raised); }
     .prow-id { display: flex; align-items: center; gap: 10px; min-width: 0; }
     .avatar { width: 32px; height: 32px; min-width: 32px; border-radius: 8px; background: var(--color-sidebar); color: #F8FAFC; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
@@ -396,6 +409,12 @@ function splitKw(raw?: string): string[] {
     .mini-fill.meta { background: #6366F1; }
     .days-cell { }
     .days-num { font-size: 13px; font-weight: 600; color: var(--color-text-secondary); }
+    .gsc-cell { display: flex; }
+    .conn { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 12px; text-decoration: none; border: 1px solid transparent; white-space: nowrap; }
+    .conn--on { background: #ECFDF5; color: #059669; border-color: #A7F3D0; }
+    .conn--off { background: var(--color-surface-raised); color: var(--color-text-muted); border-color: var(--color-border); border-style: dashed; }
+    .conn--off:hover { color: #10B981; border-color: #10B981; }
+    .conn-dot { width: 6px; height: 6px; border-radius: 50%; background: #10B981; }
     .btn-open { height: 28px; padding: 0 10px; background: var(--color-surface-raised); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 11.5px; font-weight: 500; color: var(--color-text-secondary); text-decoration: none; display: flex; align-items: center; transition: background 0.12s; }
     .btn-open:hover { background: var(--color-border); color: var(--color-text); }
     .btn-open.sm { height: 24px; font-size: 11px; padding: 0 8px; }
@@ -661,7 +680,15 @@ export class SeoDept implements OnInit {
       pagesTotal:    pages.length,
       completedAt:   p.marketing?.completedAt,
       daysActive,
+      searchConsoleUrl: p.searchConsoleUrl,
     };
+  }
+
+  protected readonly GSC_CREATE_URL = GSC_CREATE_URL;
+
+  /** Deep-link to the live Search Console property (falls back to setup when absent). */
+  protected gscLink(url?: string): string {
+    return url ? `https://search.google.com/search-console?resource_id=${encodeURIComponent(url)}` : GSC_CREATE_URL;
   }
 
   protected taskPct(p: SeoProject): number {

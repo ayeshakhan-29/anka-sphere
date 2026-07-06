@@ -21,6 +21,8 @@ import {
   CreateProjectDto,
   ProjectReport,
   ReportUpsert,
+  EmailDeliveryProfile,
+  EmailDeliveryUpsert,
   AiUsage,
   AiImageResult,
 } from '../models/project.models';
@@ -357,6 +359,17 @@ export class ProjectService {
 
   // ── AI image generation ───────────────────────────────────────────────────
 
+  getEmailDelivery(projectId: string) {
+    return this.api.get<EmailDeliveryProfile>(`/projects/${projectId}/email-delivery`);
+  }
+
+  saveEmailDelivery(projectId: string, data: EmailDeliveryUpsert) {
+    return this.api.put<EmailDeliveryProfile>(`/projects/${projectId}/email-delivery`, data);
+  }
+
+  markEmailDeliveryConfigured(projectId: string) {
+    return this.api.post<EmailDeliveryProfile>(`/projects/${projectId}/email-delivery/mark-configured`, { configured: true });
+  }
   generateAiImage(projectId: string, data: { prompt: string; size?: string; saveToAssets?: boolean; assetName?: string }) {
     return this.api.post<AiImageResult>(`/projects/${projectId}/design/ai-images`, data);
   }
