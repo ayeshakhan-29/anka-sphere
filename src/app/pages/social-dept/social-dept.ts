@@ -110,7 +110,7 @@ const ALL_PLATFORMS: Platform[] = ['Instagram', 'TikTok', 'Facebook', 'LinkedIn'
                     <span class="proj-client">{{ p.client }}</span>
                   </div>
                   @if (p.completedAt) { <ui-badge variant="success">Complete</ui-badge> }
-                  @else { <ui-badge variant="default">Active</ui-badge> }
+                  @else { <ui-badge variant="success">Active</ui-badge> }
                 </div>
                 @if (p.channels) {
                   <div class="channels-row">

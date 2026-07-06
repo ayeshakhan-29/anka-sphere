@@ -100,7 +100,7 @@ interface CMTask {
                 </div>
                 <div>
                   @if (p.completedAt) { <ui-badge variant="success">Complete</ui-badge> }
-                  @else { <ui-badge variant="default">Active</ui-badge> }
+                  @else { <ui-badge variant="success">Active</ui-badge> }
                 </div>
                 <a class="btn-open" [routerLink]="['/app/projects', p.id, 'analytics']" aria-label="Open {{ p.name }}">Open</a>
               </article>

@@ -174,7 +174,7 @@ function splitKw(raw?: string): string[] {
                   @if (p.completedAt) {
                     <ui-badge variant="success">Complete</ui-badge>
                   } @else {
-                    <ui-badge variant="default">Active</ui-badge>
+                    <ui-badge variant="success">Active</ui-badge>
                   }
                 </div>
                 <a class="btn-open" [routerLink]="['/app/projects', p.id, 'analytics']" aria-label="Open {{ p.name }}">Open</a>
