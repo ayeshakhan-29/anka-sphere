@@ -3,9 +3,9 @@
   --color-bg: #F9FAFB;
   --color-surface: #FFFFFF;
   --color-surface-raised: #F3F4F6;
-  --color-sidebar: #1E293B;
-  --color-primary: #3B82F6;
-  --color-primary-hover: #2563EB;
+  --color-sidebar: #10201B;
+  --color-primary: #0E6F58;
+  --color-primary-hover: #0B5A47;
   --color-accent: #059669;
   --color-accent-light: #A7F3D0;
   --color-accent-hover: #047857;
@@ -41,9 +41,9 @@
   --color-bg: #111827;
   --color-surface: #1F2937;
   --color-surface-raised: #374151;
-  --color-sidebar: #0F172A;
-  --color-primary: #3B82F6;
-  --color-primary-hover: #2563EB;
+  --color-sidebar: #0A1512;
+  --color-primary: #2EAE8F;
+  --color-primary-hover: #279478;
   --color-accent: #10B981;
   --color-accent-light: #6EE7B7;
   --color-accent-hover: #059669;
@@ -87,7 +87,7 @@ h1, h2, h3 {
 }
 
 ::selection {
-  background: rgb(59 130 246 / 0.22);
+  background: rgb(14 111 88 / 0.22);
 }
 
 /* Keyboard focus is always visible; pointer clicks stay clean */

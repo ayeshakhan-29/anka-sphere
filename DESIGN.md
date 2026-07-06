@@ -4,7 +4,7 @@ Visual system for Anka Sphere — captured from the live codebase. Components us
 
 ## Theme
 
-Light-first with a full dark theme (`.dark` on the root, toggled by ThemeService). Neutral cool-gray surfaces; a near-black slate sidebar anchors the shell in both themes.
+Light-first with a full dark theme (`.dark` on the root, toggled by ThemeService). Neutral cool-gray surfaces anchored by a deep-viridian identity: near-black green-tinted sidebar, viridian primary (#0E6F58 light / #2EAE8F dark) on all primary actions, focus rings, and selection. Department hues stay as wayfinding accents.
 
 ## Color
 
@@ -15,8 +15,8 @@ Defined in `src/styles.scss` on `:root` / `.dark`:
 | `--color-bg` | #F9FAFB | App background |
 | `--color-surface` | #FFFFFF | Cards, panels |
 | `--color-surface-raised` | #F3F4F6 | Wells, table heads, hover |
-| `--color-sidebar` | #1E293B | Shell sidebar (slate) |
-| `--color-primary` | #3B82F6 | Primary actions, focus |
+| `--color-sidebar` | #10201B | Shell sidebar (ink-viridian) |
+| `--color-primary` | #0E6F58 | Brand viridian — primary actions, focus, selection |
 | `--color-accent` | #059669 | Success/confirm green |
 | `--color-text` / `-secondary` / `-muted` | #111827 / #4B5563 / #9CA3AF | Ink ramp |
 | `--color-border` / `-strong` | #E5E7EB / #D1D5DB | Hairlines |

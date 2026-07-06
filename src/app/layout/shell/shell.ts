@@ -240,8 +240,8 @@ interface NavGroup {
       height: 34px;
       min-width: 34px;
       border-radius: 8px;
-      background: var(--color-accent);
-      color: #fff;
+      background: #D9F2E7;
+      color: #0B5A47;
       font-family: var(--font-display);
       font-size: 18px;
       display: flex;
@@ -275,19 +275,19 @@ interface NavGroup {
     .nav-group-label {
       font-size: 10px;
       font-weight: 600;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.1em;
       text-transform: uppercase;
-      color: rgba(255,255,255,0.3);
-      padding: 4px 10px 6px;
+      color: rgba(217, 242, 231, 0.32);
+      padding: 6px 10px 6px;
       white-space: nowrap;
     }
     .nav-item {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 9px 10px;
-      border-radius: 8px;
-      color: rgba(255,255,255,0.6);
+      padding: 8px 10px;
+      border-radius: var(--radius-md);
+      color: rgba(222, 240, 233, 0.62);
       text-decoration: none;
       font-size: 13.5px;
       font-weight: 500;
@@ -296,12 +296,13 @@ interface NavGroup {
       cursor: pointer;
     }
     .nav-item:hover {
-      background: rgba(255,255,255,0.08);
-      color: #F8FAFC;
+      background: rgba(217, 242, 231, 0.07);
+      color: #ECFDF5;
     }
     .nav-item.active {
-      background: rgba(22, 163, 74, 0.2);
-      color: #4ADE80;
+      background: rgba(60, 196, 158, 0.16);
+      color: #8CE0C4;
+      font-weight: 600;
     }
     .nav-icon {
       display: flex;
@@ -346,8 +347,8 @@ interface NavGroup {
       height: 34px;
       min-width: 34px;
       border-radius: 50%;
-      background: rgba(255,255,255,0.12);
-      color: #F8FAFC;
+      background: rgba(140, 224, 196, 0.16);
+      color: #B5EBD6;
       font-size: 12px;
       font-weight: 600;
       display: flex;
