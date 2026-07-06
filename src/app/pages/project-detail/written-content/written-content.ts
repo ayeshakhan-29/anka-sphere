@@ -140,9 +140,17 @@ const STATUS_ORDER: PageStatus[] = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'REVISION'
                       placeholder="Page title"
                       aria-label="Page title"
                     />
-                    <div class="word-count" aria-live="polite">
-                      {{ selectedPage()!.wordCount }} words
+                    <div class="editor-toolbar">
+                      <div class="word-count" aria-live="polite">
+                        {{ selectedPage()!.wordCount }} words
+                      </div>
+                      <button class="ai-draft-btn" type="button" (click)="aiDraftPage()"
+                        [disabled]="pageDrafting() || !selectedPage()!.title"
+                        aria-label="Write a first draft of this page with AI">
+                        @if (pageDrafting()) { ✨ Writing draft… } @else { ✨ AI Draft }
+                      </button>
                     </div>
+                    @if (pageDraftError()) { <div class="ai-draft-err" role="alert">{{ pageDraftError() }}</div> }
                     <textarea
                       class="body-editor"
                       [value]="selectedPage()!.body"
@@ -559,7 +567,12 @@ const STATUS_ORDER: PageStatus[] = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'REVISION'
       width: 100%;
     }
     .title-input::placeholder { color: var(--color-text-muted); }
-    .word-count { font-size: 11.5px; color: var(--color-text-muted); margin-bottom: 12px; }
+    .word-count { font-size: 11.5px; color: var(--color-text-muted); }
+    .editor-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .ai-draft-btn { height: 28px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: 14px; background: transparent; color: var(--color-text-secondary); font-family: var(--font-sans); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.12s; }
+    .ai-draft-btn:hover:not(:disabled) { border-color: #8B5CF6; color: #7C3AED; background: #F5F3FF; }
+    .ai-draft-btn:disabled { opacity: 0.6; cursor: default; }
+    .ai-draft-err { font-size: 12px; color: #DC2626; font-weight: 500; margin-bottom: 8px; }
     .body-editor {
       flex: 1;
       font-family: var(--font-sans);
@@ -794,6 +807,29 @@ export class WrittenContent implements OnInit {
     this.projectService.deletePage(this.projectId, id).subscribe(() => {
       if (this.selectedPage()?.id === id) this.selectedPage.set(null);
       this.pages.update(list => list.filter(p => p.id !== id));
+    });
+  }
+
+  protected pageDrafting = signal(false);
+  protected pageDraftError = signal<string | null>(null);
+
+  protected aiDraftPage() {
+    const page = this.selectedPage();
+    if (!page) return;
+    if (page.body.trim().length > 0 && !confirm('This page already has content. Replace it with an AI draft?')) return;
+    this.pageDraftError.set(null);
+    this.pageDrafting.set(true);
+    this.projectService.aiDraftPage(this.projectId, { title: page.title }).subscribe({
+      next: (d) => {
+        this.updatePage(page.id, 'body', d.body);
+        this.updatePage(page.id, 'seoTitle', d.seoTitle);
+        this.updatePage(page.id, 'seoDescription', d.seoDescription);
+        this.pageDrafting.set(false);
+      },
+      error: (err) => {
+        this.pageDraftError.set(err?.error?.error ?? 'AI drafting failed. Please try again.');
+        this.pageDrafting.set(false);
+      },
     });
   }
 

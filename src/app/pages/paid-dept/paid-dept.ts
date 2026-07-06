@@ -4,7 +4,7 @@ import { Badge } from '../../ui';
 import { ProjectService } from '../../services/project.service';
 import { Project } from '../../models/project.models';
 
-type TabId = 'projects' | 'budget' | 'tasks';
+type TabId = 'projects' | 'budget' | 'adcopy' | 'tasks';
 
 interface PaidProject {
   id: string; name: string; client: string; clientInitials: string;
@@ -146,6 +146,63 @@ interface PaidTask {
           </div>
         }
 
+        <!-- Ad Copy tab -->
+        @if (activeTab() === 'adcopy') {
+          <section class="adcopy-panel" aria-label="AI ad copy generator">
+            <div class="adcopy-card">
+              <div class="adcopy-label">✨ AI ad copy — written in the client's brand voice</div>
+              <div class="adcopy-controls">
+                <select class="adcopy-select" [value]="adProjectId()" (change)="adProjectId.set($any($event.target).value)"
+                  aria-label="Client project" [disabled]="adWriting()">
+                  <option value="">— Select project —</option>
+                  @for (p of projects(); track p.id) { <option [value]="p.id">{{ p.name }}</option> }
+                </select>
+                <div class="network-toggle" role="group" aria-label="Ad network">
+                  <button class="net-btn" [class.active]="adNetwork() === 'GOOGLE'" (click)="adNetwork.set('GOOGLE')"
+                    [attr.aria-pressed]="adNetwork() === 'GOOGLE'" [disabled]="adWriting()">Google Ads</button>
+                  <button class="net-btn" [class.active]="adNetwork() === 'META'" (click)="adNetwork.set('META')"
+                    [attr.aria-pressed]="adNetwork() === 'META'" [disabled]="adWriting()">Meta</button>
+                </div>
+              </div>
+              <div class="adcopy-controls">
+                <input class="adcopy-goal" type="text"
+                  placeholder="Campaign goal — e.g. drive first-time subscriptions for the summer veg box"
+                  [value]="adGoal()" (input)="adGoal.set($any($event.target).value)" [disabled]="adWriting()"
+                  aria-label="Campaign goal" />
+                <button class="btn-generate" (click)="writeAdCopy()"
+                  [disabled]="adWriting() || !adProjectId() || adGoal().trim().length < 3">
+                  @if (adWriting()) { Writing… } @else { Generate Copy }
+                </button>
+              </div>
+              @if (adError()) { <div class="adcopy-error" role="alert">{{ adError() }}</div> }
+            </div>
+
+            @if (adHeadlines().length > 0) {
+              <div class="adcopy-results">
+                <div class="adcopy-col">
+                  <div class="adcopy-col-title">Headlines <span class="col-limit">{{ adNetwork() === 'GOOGLE' ? 'max 30 chars' : 'max 40 chars' }}</span></div>
+                  @for (h of adHeadlines(); track $index) {
+                    <button class="copy-line" (click)="copyLine(h)" [attr.aria-label]="'Copy headline: ' + h">
+                      <span class="copy-text">{{ h }}</span>
+                      <span class="copy-chars" [class.over]="h.length > (adNetwork() === 'GOOGLE' ? 30 : 40)">{{ h.length }}</span>
+                    </button>
+                  }
+                </div>
+                <div class="adcopy-col">
+                  <div class="adcopy-col-title">{{ adNetwork() === 'GOOGLE' ? 'Descriptions' : 'Primary Text' }} <span class="col-limit">{{ adNetwork() === 'GOOGLE' ? 'max 90 chars' : '80–125 chars' }}</span></div>
+                  @for (d of adDescriptions(); track $index) {
+                    <button class="copy-line" (click)="copyLine(d)" [attr.aria-label]="'Copy description: ' + d">
+                      <span class="copy-text">{{ d }}</span>
+                      <span class="copy-chars" [class.over]="d.length > (adNetwork() === 'GOOGLE' ? 90 : 125)">{{ d.length }}</span>
+                    </button>
+                  }
+                </div>
+              </div>
+              <p class="adcopy-hint">Click any line to copy it. {{ copiedLine() ? '✓ Copied!' : '' }}</p>
+            }
+          </section>
+        }
+
         <!-- Tasks tab -->
         @if (activeTab() === 'tasks') {
           <div class="filter-row" role="group" aria-label="Filter by status">
@@ -242,6 +299,32 @@ interface PaidTask {
     .proj-link { font-size: 12.5px; font-weight: 500; color: #EF4444; text-decoration: none; }
     .proj-link:hover { text-decoration: underline; }
 
+    /* Ad copy generator */
+    .adcopy-panel { display: flex; flex-direction: column; gap: 16px; }
+    .adcopy-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 18px; display: flex; flex-direction: column; gap: 10px; box-shadow: var(--shadow-card); }
+    .adcopy-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-text-muted); }
+    .adcopy-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+    .adcopy-select { height: 34px; padding: 0 10px; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 13px; color: var(--color-text); background: var(--color-surface); cursor: pointer; min-width: 220px; }
+    .network-toggle { display: flex; border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
+    .net-btn { height: 34px; padding: 0 14px; border: none; background: transparent; font-family: var(--font-sans); font-size: 12.5px; font-weight: 600; color: var(--color-text-secondary); cursor: pointer; }
+    .net-btn.active { background: #EF4444; color: #fff; }
+    .adcopy-goal { flex: 1; min-width: 260px; height: 34px; padding: 0 12px; border: 1.5px solid var(--color-border); border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 13px; color: var(--color-text); background: var(--color-surface); outline: none; }
+    .adcopy-goal:focus { border-color: #EF4444; }
+    .btn-generate { height: 34px; padding: 0 16px; background: #EF4444; color: #fff; border: none; border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-generate:disabled { opacity: 0.6; cursor: default; }
+    .adcopy-error { font-size: 12px; color: #DC2626; font-weight: 500; }
+    .adcopy-results { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 900px) { .adcopy-results { grid-template-columns: 1fr; } }
+    .adcopy-col { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 14px; display: flex; flex-direction: column; gap: 6px; }
+    .adcopy-col-title { font-size: 12px; font-weight: 700; color: var(--color-text); margin-bottom: 4px; }
+    .col-limit { font-size: 10.5px; font-weight: 500; color: var(--color-text-muted); margin-left: 6px; }
+    .copy-line { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 8px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: transparent; font-family: var(--font-sans); cursor: pointer; text-align: left; transition: border-color 0.12s, background 0.12s; }
+    .copy-line:hover { border-color: #EF4444; background: #FEF2F2; }
+    .copy-text { font-size: 13px; color: var(--color-text); line-height: 1.45; }
+    .copy-chars { font-size: 10.5px; font-weight: 700; color: var(--color-text-muted); flex-shrink: 0; }
+    .copy-chars.over { color: #DC2626; }
+    .adcopy-hint { font-size: 11.5px; color: var(--color-text-muted); margin: 0; }
+
     .filter-row { display: flex; gap: 4px; flex-wrap: wrap; }
     .ftab { display: flex; align-items: center; gap: 5px; height: 30px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: 15px; font-family: var(--font-sans); font-size: 12px; font-weight: 500; color: var(--color-text-secondary); background: var(--color-surface); cursor: pointer; transition: all 0.15s; }
     .ftab:hover { border-color: #EF4444; color: #B91C1C; }
@@ -276,8 +359,44 @@ export class PaidDept implements OnInit {
   readonly tabs = [
     { id: 'projects' as TabId, label: 'Projects',            count: computed(() => this.projects().length) },
     { id: 'budget'   as TabId, label: 'Budget & Strategy',   count: computed(() => this.projects().filter(p => !!p.budget).length) },
+    { id: 'adcopy'   as TabId, label: 'Ad Copy',             count: computed(() => 0) },
     { id: 'tasks'    as TabId, label: 'Tasks',               count: computed(() => this.allTasks().length) },
   ];
+
+  // AI ad copy
+  protected adProjectId    = signal('');
+  protected adNetwork      = signal<'GOOGLE' | 'META'>('GOOGLE');
+  protected adGoal         = signal('');
+  protected adWriting      = signal(false);
+  protected adError        = signal<string | null>(null);
+  protected adHeadlines    = signal<string[]>([]);
+  protected adDescriptions = signal<string[]>([]);
+  protected copiedLine     = signal(false);
+
+  protected writeAdCopy(): void {
+    this.adError.set(null);
+    this.adWriting.set(true);
+    this.projectService.generateAiAdCopy(this.adProjectId(), {
+      network: this.adNetwork(),
+      goal: this.adGoal().trim(),
+    }).subscribe({
+      next: (res) => {
+        this.adHeadlines.set(res.headlines);
+        this.adDescriptions.set(res.descriptions);
+        this.adWriting.set(false);
+      },
+      error: (err) => {
+        this.adError.set(err?.error?.error ?? 'Ad copy generation failed. Please try again.');
+        this.adWriting.set(false);
+      },
+    });
+  }
+
+  protected async copyLine(text: string): Promise<void> {
+    await navigator.clipboard.writeText(text);
+    this.copiedLine.set(true);
+    setTimeout(() => this.copiedLine.set(false), 1500);
+  }
 
   readonly taskFilters = [
     { label: 'All',         value: 'all'         as const, count: computed(() => this.allTasks().length) },

@@ -375,6 +375,18 @@ export class ProjectService {
     );
   }
 
+  aiDraftPage(projectId: string, data: { title: string; notes?: string }) {
+    return this.api.post<{ body: string; seoTitle: string; seoDescription: string }>(
+      `/projects/${projectId}/content/ai-page-draft`, data,
+    );
+  }
+
+  generateAiAdCopy(projectId: string, data: { network: 'GOOGLE' | 'META'; goal: string }) {
+    return this.api.post<{ headlines: string[]; descriptions: string[] }>(
+      `/projects/${projectId}/paid/ai-ad-copy`, data,
+    );
+  }
+
   aiDraftReport(projectId: string, type: 'WEEKLY' | 'MONTHLY') {
     return this.api.post<{ summary: string; highlights: string; blockers: string; nextSteps: string }>(
       `/projects/${projectId}/reports/ai-draft`, { type },
