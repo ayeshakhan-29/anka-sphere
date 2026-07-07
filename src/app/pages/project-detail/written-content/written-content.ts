@@ -882,6 +882,7 @@ export class WrittenContent implements OnInit {
           projectName: name,
           route: `/app/projects/${this.projectId}/design`,
         });
+        this.notifService.toast('6 default Design tasks have been pre-populated', 'info');
       },
       error: (err) => {
         this.gateError.set(err?.error?.error ?? 'Gate approval failed.');

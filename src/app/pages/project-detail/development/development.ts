@@ -2232,6 +2232,7 @@ export class DevelopmentTab implements OnInit, OnDestroy {
           projectName: name,
           route: `/app/projects/${this.projectId}/analytics`,
         });
+        this.notifService.toast('6 default Marketing tasks have been pre-populated', 'info');
       },
       error: (err) => {
         this.gateError.set(err?.error?.error ?? 'Gate approval failed.');

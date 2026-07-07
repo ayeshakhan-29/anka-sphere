@@ -1025,6 +1025,7 @@ export class DesignModule implements OnInit {
           projectName: name,
           route: `/app/projects/${this.projectId}/development`,
         });
+        this.notifService.toast('7 default Development tasks have been pre-populated', 'info');
       },
       error: (err) => {
         this.gateError.set(err?.error?.error ?? 'Gate approval failed.');
