@@ -216,6 +216,8 @@ export interface Project {
   description?: string;
   startDate?: string;
   targetDate?: string;
+  analyticsPropertyId?: string;
+  searchConsoleUrl?: string;
   createdAt: string;
   updatedAt: string;
   members: ProjectMember[];
@@ -235,6 +237,8 @@ export interface CreateProjectDto {
   description?: string;
   startDate?: string;
   targetDate?: string;
+  analyticsPropertyId?: string;
+  searchConsoleUrl?: string;
 }
 
 // ── Maintenance Models ────────────────────────────────────────────────
@@ -413,6 +417,47 @@ export interface ReportUpsert {
   blockers?: string;
   highlights?: string;
   nextSteps?: string;
+}
+
+export type EmailDeliveryProvider = 'RESEND' | 'POSTMARK' | 'SENDGRID' | 'MAILGUN' | 'CUSTOM_SMTP';
+export type EmailDeliveryStatus = 'PENDING_DNS' | 'ACTIVE';
+
+export interface EmailDnsRecord {
+  type: 'TXT' | 'CNAME' | 'MX';
+  host: string;
+  value: string;
+  priority?: number;
+  purpose: 'SPF' | 'DKIM' | 'DMARC' | 'RETURN_PATH' | 'INBOUND';
+  required: boolean;
+}
+
+export interface EmailDeliverySettings {
+  id: string;
+  projectId: string;
+  provider: EmailDeliveryProvider;
+  domain: string;
+  fromName: string;
+  fromEmail: string;
+  replyToEmail?: string | null;
+  status: EmailDeliveryStatus;
+  verifiedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmailDeliveryProfile {
+  settings: EmailDeliverySettings | null;
+  dnsRecords: EmailDnsRecord[];
+  estimatedSetupMinutes: number;
+  activeFrom: string | null;
+}
+
+export interface EmailDeliveryUpsert {
+  provider: EmailDeliveryProvider;
+  domain: string;
+  fromName: string;
+  fromLocalPart: string;
+  replyToEmail?: string;
 }
 
 // ── AI image generation ───────────────────────────────────────────────────────

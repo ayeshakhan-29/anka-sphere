@@ -200,6 +200,33 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
               </div>
             </div>
 
+            <!-- Analytics & Search (optional) -->
+            <div class="section-divider">
+              <span class="section-label">Analytics &amp; Search</span>
+              <span class="section-hint">Optional — powers the Analytics Hub &amp; SEO dept</span>
+            </div>
+
+            <div class="field">
+              <label for="proj-ga4" class="label">Google Analytics (GA4) Property ID</label>
+              <input id="proj-ga4" class="input" formControlName="analyticsPropertyId" placeholder="e.g. G-XXXXXXXXXX or 123456789" />
+              <a class="connect-link" [href]="GA_CREATE_URL" target="_blank" rel="noopener">
+                Don't have one? Create in Google Analytics
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              </a>
+            </div>
+
+            <div class="field">
+              <label for="proj-gsc" class="label">Search Console Property URL</label>
+              <input id="proj-gsc" class="input" formControlName="searchConsoleUrl" placeholder="e.g. https://clientsite.com" />
+              @if (newProjectForm.get('searchConsoleUrl')?.invalid && newProjectForm.get('searchConsoleUrl')?.touched) {
+                <span class="field-error">Enter a full URL, e.g. https://clientsite.com</span>
+              }
+              <a class="connect-link" [href]="GSC_CREATE_URL" target="_blank" rel="noopener">
+                Don't have one? Set up Search Console
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              </a>
+            </div>
+
             @if (createError()) {
               <div class="field-error" role="alert">{{ createError() }}</div>
             }
@@ -416,6 +443,9 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
       border-radius: var(--radius-lg);
       width: 100%;
       max-width: 480px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
       box-shadow: var(--shadow-raised);
     }
     .modal-header {
@@ -423,6 +453,7 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
       align-items: center;
       justify-content: space-between;
       padding: 20px 24px 0;
+      flex-shrink: 0;
     }
     .modal-title {
       font-family: var(--font-display);
@@ -444,7 +475,7 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
       cursor: pointer;
     }
     .modal-close:hover { background: var(--color-surface-raised); color: var(--color-text); }
-    .modal-form { padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 16px; }
+    .modal-form { padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; flex: 1; min-height: 0; }
     .field { display: flex; flex-direction: column; gap: 6px; }
     .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .label { font-size: 13px; font-weight: 500; color: var(--color-text); }
@@ -466,6 +497,11 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
     .input:focus { border-color: var(--color-accent); }
     .input--textarea { height: auto; padding: 10px 12px; resize: vertical; }
     .field-error { font-size: 12px; color: #EF4444; }
+    .section-divider { display: flex; align-items: baseline; gap: 8px; padding-top: 6px; margin-top: 2px; border-top: 1px solid var(--color-border); }
+    .section-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-secondary); }
+    .section-hint { font-size: 11.5px; color: var(--color-text-muted); }
+    .connect-link { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; color: var(--color-accent); text-decoration: none; width: fit-content; }
+    .connect-link:hover { text-decoration: underline; }
     .modal-actions { display: flex; justify-content: flex-end; gap: 10px; padding-top: 4px; }
     .btn-cancel {
       height: 38px;
@@ -518,12 +554,18 @@ export class Projects implements OnInit {
     { label: 'Marketing',       value: 'MARKETING'       as PipelineStage, color: '#16A34A' },
   ];
 
+  // External links for users who don't yet have a Google property set up
+  protected readonly GA_CREATE_URL = 'https://analytics.google.com/analytics/web/#/provision';
+  protected readonly GSC_CREATE_URL = 'https://search.google.com/search-console/welcome';
+
   protected newProjectForm = this.fb.group({
-    name:        ['', Validators.required],
-    clientName:  ['', Validators.required],
-    description: [''],
-    startDate:   [''],
-    targetDate:  [''],
+    name:                ['', Validators.required],
+    clientName:          ['', Validators.required],
+    description:         [''],
+    startDate:           [''],
+    targetDate:          [''],
+    analyticsPropertyId: [''],
+    searchConsoleUrl:    ['', Validators.pattern(/^https?:\/\/.+/)],
   });
 
   protected tabs = [
@@ -573,11 +615,13 @@ export class Projects implements OnInit {
     this.createError.set(null);
     const v = this.newProjectForm.value;
     this.projectService.createProject({
-      name:        v.name!,
-      clientName:  v.clientName!,
-      description: v.description || undefined,
-      startDate:   v.startDate || undefined,
-      targetDate:  v.targetDate || undefined,
+      name:                v.name!,
+      clientName:          v.clientName!,
+      description:         v.description || undefined,
+      startDate:           v.startDate || undefined,
+      targetDate:          v.targetDate || undefined,
+      analyticsPropertyId: v.analyticsPropertyId || undefined,
+      searchConsoleUrl:    v.searchConsoleUrl || undefined,
     }).subscribe({
       next: (project) => {
         this.projects.update(list => [project, ...list]);

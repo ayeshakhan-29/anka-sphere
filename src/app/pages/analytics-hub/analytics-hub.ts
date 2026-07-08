@@ -17,11 +17,15 @@ const CAT_COLORS: Record<string, string> = {
   PAID: '#EF4444', ANALYTICS: '#6366F1', OTHER: '#94A3B8',
 };
 
+const GA_CREATE_URL = 'https://analytics.google.com/analytics/web/#/provision';
+const GSC_CREATE_URL = 'https://search.google.com/search-console/welcome';
+
 interface AHProject {
   id: string; name: string; client: string; clientInitials: string;
   stage: string; daysInMarketing: number;
   tasksDone: number; tasksTotal: number;
   hasStrategy: boolean; completedAt?: string;
+  analyticsPropertyId?: string; searchConsoleUrl?: string;
 }
 
 interface StageRow {
@@ -120,6 +124,24 @@ interface TaskRow {
                   </div>
                   <span class="progress-label">{{ taskPct(p) }}% tasks complete</span>
                 }
+
+                <!-- Data connections -->
+                <div class="conn-row" aria-label="Data connections">
+                  @if (p.analyticsPropertyId) {
+                    <a class="conn conn--on" [href]="GA_CREATE_URL" target="_blank" rel="noopener" [title]="'GA4: ' + p.analyticsPropertyId">
+                      <span class="conn-dot" aria-hidden="true"></span>GA4 · {{ p.analyticsPropertyId }}
+                    </a>
+                  } @else {
+                    <a class="conn conn--off" [href]="GA_CREATE_URL" target="_blank" rel="noopener">+ Connect GA4</a>
+                  }
+                  @if (p.searchConsoleUrl) {
+                    <a class="conn conn--on" [href]="gscLink(p.searchConsoleUrl)" target="_blank" rel="noopener" [title]="'Search Console: ' + p.searchConsoleUrl">
+                      <span class="conn-dot" aria-hidden="true"></span>Search Console
+                    </a>
+                  } @else {
+                    <a class="conn conn--off" [href]="GSC_CREATE_URL" target="_blank" rel="noopener">+ Connect Search Console</a>
+                  }
+                </div>
 
                 <a class="proj-link" [routerLink]="['/app/projects', p.id, 'analytics']" aria-label="Open {{ p.name }}">Open project →</a>
               </article>
@@ -273,6 +295,12 @@ interface TaskRow {
     .progress-bar { width: 100%; height: 5px; background: var(--color-surface-raised); border-radius: 4px; overflow: hidden; }
     .progress-fill { height: 100%; background: #6366F1; border-radius: 4px; }
     .progress-label { font-size: 11px; color: var(--color-text-muted); }
+    .conn-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .conn { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 12px; text-decoration: none; border: 1px solid transparent; }
+    .conn--on { background: #ECFDF5; color: #059669; border-color: #A7F3D0; }
+    .conn--off { background: var(--color-surface-raised); color: var(--color-text-muted); border-color: var(--color-border); border-style: dashed; }
+    .conn--off:hover { color: #6366F1; border-color: #6366F1; }
+    .conn-dot { width: 6px; height: 6px; border-radius: 50%; background: #10B981; }
     .proj-link { font-size: 13px; font-weight: 500; color: #6366F1; text-decoration: none; margin-top: auto; }
     .proj-link:hover { text-decoration: underline; }
     .empty-state { text-align: center; padding: 40px 24px; color: var(--color-text-muted); font-size: 13.5px; border: 1.5px dashed var(--color-border); border-radius: var(--radius-lg); }
@@ -420,7 +448,17 @@ export class AnalyticsHub implements OnInit {
       tasksTotal: tasks.length,
       hasStrategy: !!(p.marketing?.strategy || p.marketing?.channels),
       completedAt: p.marketing?.completedAt,
+      analyticsPropertyId: p.analyticsPropertyId,
+      searchConsoleUrl: p.searchConsoleUrl,
     };
+  }
+
+  protected readonly GA_CREATE_URL = GA_CREATE_URL;
+  protected readonly GSC_CREATE_URL = GSC_CREATE_URL;
+
+  /** Deep-link to the live Search Console property (falls back to setup when absent). */
+  protected gscLink(url?: string): string {
+    return url ? `https://search.google.com/search-console?resource_id=${encodeURIComponent(url)}` : GSC_CREATE_URL;
   }
 
   protected taskPct(p: AHProject): number {
