@@ -1,8 +1,10 @@
 import { Component, signal, computed, inject, OnInit } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Badge } from '../../ui';
 import { ProjectService } from '../../services/project.service';
-import { Project } from '../../models/project.models';
+import { IntegrationService } from '../../services/integration.service';
+import { Project, GscMetrics } from '../../models/project.models';
 
 type TabId = 'projects' | 'keywords' | 'onpage' | 'tasks';
 
@@ -62,7 +64,7 @@ function splitKw(raw?: string): string[] {
 
 @Component({
   selector: 'app-seo-dept',
-  imports: [RouterLink, Badge],
+  imports: [RouterLink, Badge, DecimalPipe],
   template: `
     <div class="seo-page">
 
@@ -201,6 +203,46 @@ function splitKw(raw?: string): string[] {
         <!-- ── Tab: Keyword Board ── -->
         @if (activeTab() === 'keywords') {
           <div class="kw-board">
+
+            <!-- Live GSC queries -->
+            <div class="gsc-live">
+              <div class="gsc-live-head">
+                <span class="gsc-live-title">Live Search Console queries</span>
+                @if (googleConnected()) {
+                  <select class="gsc-select" [value]="gscProjectId()" (change)="selectGscProject($any($event.target).value)" aria-label="Project">
+                    <option value="">Select a project…</option>
+                    @for (p of gscProjects(); track p.id) {
+                      <option [value]="p.id">{{ p.name }}</option>
+                    }
+                  </select>
+                }
+              </div>
+              @if (!googleConnected()) {
+                <p class="gsc-live-hint">Connect Google in <a routerLink="/app/settings">Settings → Integrations</a> to see real queries next to the keyword board.</p>
+              } @else if (gscLoading()) {
+                <div class="loading-state" role="status"><div class="spinner" aria-hidden="true"></div>Fetching queries…</div>
+              } @else if (gscError()) {
+                <p class="gsc-live-hint">{{ gscError() }}</p>
+              } @else if (gscData(); as s) {
+                <div class="gsc-totals">
+                  <span><strong>{{ s.clicks | number }}</strong> clicks</span>
+                  <span><strong>{{ s.impressions | number }}</strong> impressions</span>
+                  <span><strong>{{ s.avgPosition | number:'1.0-1' }}</strong> avg position</span>
+                  <span class="gsc-range">last {{ s.rangeDays }}d</span>
+                </div>
+                <div class="gsc-queries">
+                  @for (q of s.topQueries; track q.query) {
+                    <span class="gsc-q" [title]="q.clicks + ' clicks · pos ' + (q.position | number:'1.0-1')">
+                      {{ q.query }} <strong>{{ q.clicks }}</strong>
+                    </span>
+                  } @empty {
+                    <p class="gsc-live-hint">No query data in this window yet.</p>
+                  }
+                </div>
+              } @else if (gscProjectId()) {
+                <p class="gsc-live-hint">No data loaded.</p>
+              }
+            </div>
 
             <!-- Filter row -->
             <div class="kw-filter-row">
@@ -429,6 +471,16 @@ function splitKw(raw?: string): string[] {
 
     /* Keyword Board */
     .kw-board { display: flex; flex-direction: column; gap: 12px; }
+    .gsc-live { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+    .gsc-live-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .gsc-live-title { font-size: 13px; font-weight: 600; color: var(--color-text); }
+    .gsc-select { height: 30px; padding: 0 8px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 12.5px; color: var(--color-text); background: var(--color-surface); }
+    .gsc-live-hint { font-size: 12.5px; color: var(--color-text-muted); margin: 0; }
+    .gsc-live-hint a { color: #10B981; }
+    .gsc-totals { display: flex; gap: 16px; font-size: 12.5px; color: var(--color-text-secondary); align-items: center; }
+    .gsc-range { margin-left: auto; font-size: 11px; color: var(--color-text-muted); }
+    .gsc-queries { display: flex; flex-wrap: wrap; gap: 6px; }
+    .gsc-q { font-size: 12px; padding: 4px 10px; border-radius: 14px; background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; }
     .kw-project-group { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; }
     .kw-group-header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--color-surface-raised); border-bottom: 1px solid var(--color-border); }
     .kw-group-name { font-size: 13.5px; font-weight: 600; color: var(--color-text); }
@@ -613,6 +665,12 @@ export class SeoDept implements OnInit {
   });
 
   ngOnInit() {
+    this.integrationService.getIntegrations().subscribe({
+      next: (res) => this.googleConnected.set(
+        res.integrations.some(i => i.provider === 'GOOGLE_SEARCH_CONSOLE' && i.status === 'CONNECTED'),
+      ),
+      error: () => this.googleConnected.set(false),
+    });
     this.projectService.getProjects().subscribe({
       next: (projects) => {
         const seoProjects = projects.filter(p => p.currentStage === 'MARKETING' || !!p.marketing);
@@ -685,6 +743,31 @@ export class SeoDept implements OnInit {
   }
 
   protected readonly GSC_CREATE_URL = GSC_CREATE_URL;
+
+  // ── Live GSC queries ────────────────────────────────────────────────────
+  private integrationService = inject(IntegrationService);
+  protected googleConnected = signal(false);
+  protected gscProjectId    = signal('');
+  protected gscLoading      = signal(false);
+  protected gscError        = signal('');
+  protected gscData         = signal<GscMetrics | null>(null);
+
+  protected gscProjects = computed(() => this.projects().filter(p => p.searchConsoleUrl));
+
+  protected selectGscProject(id: string) {
+    this.gscProjectId.set(id);
+    this.gscData.set(null);
+    this.gscError.set('');
+    if (!id) return;
+    this.gscLoading.set(true);
+    this.projectService.getGscMetrics(id, 30).subscribe({
+      next: (env) => { this.gscData.set(env.data); this.gscLoading.set(false); },
+      error: (err) => {
+        this.gscError.set(err?.error?.error ?? 'Search Console request failed.');
+        this.gscLoading.set(false);
+      },
+    });
+  }
 
   /** Deep-link to the live Search Console property (falls back to setup when absent). */
   protected gscLink(url?: string): string {

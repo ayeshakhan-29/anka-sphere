@@ -1,10 +1,12 @@
 import { Component, signal, computed, inject, OnInit } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Badge } from '../../ui';
 import { ProjectService } from '../../services/project.service';
-import { Project } from '../../models/project.models';
+import { IntegrationService } from '../../services/integration.service';
+import { Project, Ga4Metrics, GscMetrics, MetricsEnvelope } from '../../models/project.models';
 
-type TabId = 'projects' | 'pipeline' | 'tasks';
+type TabId = 'projects' | 'pipeline' | 'tasks' | 'live';
 
 const STAGES = ['PROFILING', 'WRITTEN_CONTENT', 'DESIGN', 'DEVELOPMENT', 'MARKETING'] as const;
 const STAGE_LABELS: Record<string, string> = {
@@ -43,7 +45,7 @@ interface TaskRow {
 
 @Component({
   selector: 'app-analytics-hub',
-  imports: [RouterLink, Badge],
+  imports: [RouterLink, Badge, DecimalPipe],
   template: `
     <div class="ah-page">
 
@@ -247,6 +249,82 @@ interface TaskRow {
           </div>
         }
 
+        <!-- Live Metrics tab -->
+        @if (activeTab() === 'live') {
+          @if (!googleConnected()) {
+            <div class="setup-card">
+              <h3 class="setup-title">Connect Google to see live metrics</h3>
+              <p class="setup-text">GA4 sessions, users and conversions plus Search Console clicks and queries appear here once a Google account is connected in <a routerLink="/app/settings">Settings → Integrations</a>. Projects also need a GA4 property ID / Search Console URL set on their overview tab.</p>
+            </div>
+          } @else {
+            <div class="live-controls">
+              <select class="live-select" [value]="liveProjectId()" (change)="selectLiveProject($any($event.target).value)" aria-label="Project">
+                <option value="">Select a project…</option>
+                @for (p of connectableProjects(); track p.id) {
+                  <option [value]="p.id">{{ p.name }} — {{ p.clientName }}</option>
+                }
+              </select>
+              @for (r of ranges; track r) {
+                <button class="ftab" [class.active]="liveRange() === r" (click)="setLiveRange(r)">{{ r }}d</button>
+              }
+              @if (liveProjectId()) {
+                <button class="ftab" (click)="loadLive(true)" [disabled]="liveLoading()">↻ Refresh</button>
+              }
+              @if (liveFetchedAt()) { <span class="live-note">Updated {{ liveFetchedAt() }}</span> }
+            </div>
+
+            @if (liveLoading()) {
+              <div class="loading-state" role="status"><div class="spinner" aria-hidden="true"></div>Fetching live data…</div>
+            } @else if (liveError()) {
+              <div class="setup-card"><p class="setup-text">{{ liveError() }}</p></div>
+            } @else if (ga4() || gsc()) {
+              @if (ga4(); as g) {
+                <h3 class="live-h">GA4 — last {{ g.rangeDays }} days</h3>
+                <div class="kpi-strip">
+                  <div class="kpi-card"><div><div class="kpi-value">{{ g.sessions | number }}</div><div class="kpi-label">Sessions</div></div></div>
+                  <div class="kpi-card"><div><div class="kpi-value">{{ g.totalUsers | number }}</div><div class="kpi-label">Users</div></div></div>
+                  <div class="kpi-card"><div><div class="kpi-value">{{ g.conversions | number }}</div><div class="kpi-label">Conversions</div></div></div>
+                  <div class="kpi-card"><div><div class="kpi-value">{{ g.engagementRate * 100 | number:'1.0-1' }}%</div><div class="kpi-label">Engagement</div></div></div>
+                </div>
+                @if (g.topPages.length) {
+                  <div class="live-table">
+                    <div class="lt-head"><span>Top pages</span><span>Sessions</span><span>Users</span></div>
+                    @for (row of g.topPages; track row.path) {
+                      <div class="lt-row"><span class="lt-main">{{ row.path }}</span><span>{{ row.sessions | number }}</span><span>{{ row.users | number }}</span></div>
+                    }
+                  </div>
+                }
+              } @else {
+                <p class="live-note">No GA4 property configured on this project.</p>
+              }
+
+              @if (gsc(); as s) {
+                <h3 class="live-h">Search Console — last {{ s.rangeDays }} days</h3>
+                <div class="kpi-strip">
+                  <div class="kpi-card"><div><div class="kpi-value">{{ s.clicks | number }}</div><div class="kpi-label">Clicks</div></div></div>
+                  <div class="kpi-card"><div><div class="kpi-value">{{ s.impressions | number }}</div><div class="kpi-label">Impressions</div></div></div>
+                  <div class="kpi-card"><div><div class="kpi-value">{{ s.ctr * 100 | number:'1.0-1' }}%</div><div class="kpi-label">CTR</div></div></div>
+                  <div class="kpi-card"><div><div class="kpi-value">{{ s.avgPosition | number:'1.0-1' }}</div><div class="kpi-label">Avg position</div></div></div>
+                </div>
+                @if (s.topQueries.length) {
+                  <div class="live-table">
+                    <div class="lt-head"><span>Top queries</span><span>Clicks</span><span>Impr.</span></div>
+                    @for (row of s.topQueries; track row.query) {
+                      <div class="lt-row"><span class="lt-main">{{ row.query }}</span><span>{{ row.clicks | number }}</span><span>{{ row.impressions | number }}</span></div>
+                    }
+                  </div>
+                }
+              } @else {
+                <p class="live-note">No Search Console property configured on this project.</p>
+              }
+            } @else if (liveProjectId()) {
+              <div class="empty-state">No data yet — hit Refresh to fetch.</div>
+            } @else {
+              <div class="empty-state">Pick a project to see its live GA4 / Search Console data.</div>
+            }
+          }
+        }
+
       }
     </div>
   `,
@@ -351,6 +429,22 @@ interface TaskRow {
     .task-status[data-s="DONE"] { background: #ECFDF5; color: #059669; }
     .task-status[data-s="IN_PROGRESS"] { background: #EFF6FF; color: #2563EB; }
     .task-status[data-s="IN_REVIEW"] { background: #FEF3C7; color: #D97706; }
+
+    /* Live Metrics tab */
+    .setup-card { padding: 24px; background: var(--color-surface); border: 1.5px dashed var(--color-border-strong); border-radius: var(--radius-lg); }
+    .setup-title { font-size: 15px; font-weight: 600; color: var(--color-text); margin: 0 0 6px; }
+    .setup-text { font-size: 13px; color: var(--color-text-secondary); margin: 0; line-height: 1.6; }
+    .setup-text a { color: #6366F1; }
+    .live-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .live-select { height: 32px; padding: 0 10px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 13px; color: var(--color-text); background: var(--color-surface); min-width: 240px; }
+    .live-note { font-size: 11.5px; color: var(--color-text-muted); }
+    .live-h { font-size: 14px; font-weight: 600; color: var(--color-text); margin: 8px 0 0; }
+    .live-table { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; }
+    .lt-head, .lt-row { display: grid; grid-template-columns: 1fr 90px 90px; gap: 10px; padding: 8px 14px; }
+    .lt-head { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-muted); border-bottom: 1px solid var(--color-border); }
+    .lt-row { font-size: 12.5px; color: var(--color-text); border-bottom: 1px solid var(--color-border); }
+    .lt-row:last-child { border-bottom: none; }
+    .lt-main { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   `]
 })
 export class AnalyticsHub implements OnInit {
@@ -381,6 +475,7 @@ export class AnalyticsHub implements OnInit {
     { id: 'projects'  as TabId, label: 'Marketing Projects', count: computed(() => this.marketingProjects().length) },
     { id: 'pipeline'  as TabId, label: 'Pipeline Funnel',    count: computed(() => this.allProjects().length) },
     { id: 'tasks'     as TabId, label: 'Task Breakdown',     count: computed(() => this.allTasks().length) },
+    { id: 'live'      as TabId, label: 'Live Metrics',       count: computed(() => 0) },
   ];
 
   readonly taskFilters = [
@@ -434,6 +529,74 @@ export class AnalyticsHub implements OnInit {
       next: (projects) => { this.allProjects.set(projects); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
+    this.integrationService.getIntegrations().subscribe({
+      next: (res) => this.googleConnected.set(
+        res.integrations.some(i => i.provider === 'GOOGLE_ANALYTICS' && i.status === 'CONNECTED'),
+      ),
+      error: () => this.googleConnected.set(false),
+    });
+  }
+
+  // ── Live metrics ──────────────────────────────────────────────────────────
+
+  readonly ranges = [7, 30, 90] as const;
+  private integrationService = inject(IntegrationService);
+  protected googleConnected = signal(false);
+  protected liveProjectId   = signal('');
+  protected liveRange       = signal<7 | 30 | 90>(30);
+  protected liveLoading     = signal(false);
+  protected liveError       = signal('');
+  protected liveFetchedAt   = signal('');
+  protected ga4             = signal<Ga4Metrics | null>(null);
+  protected gsc             = signal<GscMetrics | null>(null);
+
+  protected connectableProjects = computed(() =>
+    this.allProjects().filter(p => p.analyticsPropertyId || p.searchConsoleUrl),
+  );
+
+  protected selectLiveProject(id: string) {
+    this.liveProjectId.set(id);
+    this.ga4.set(null); this.gsc.set(null); this.liveError.set(''); this.liveFetchedAt.set('');
+    if (id) this.loadLive(false);
+  }
+
+  protected setLiveRange(r: 7 | 30 | 90) {
+    this.liveRange.set(r);
+    if (this.liveProjectId()) this.loadLive(false);
+  }
+
+  protected loadLive(refresh: boolean) {
+    const id = this.liveProjectId();
+    const project = this.allProjects().find(p => p.id === id);
+    if (!project) return;
+
+    this.liveLoading.set(true);
+    this.liveError.set('');
+    this.ga4.set(null); this.gsc.set(null);
+
+    let pending = 0;
+    const done = () => { if (--pending === 0) this.liveLoading.set(false); };
+    const stamp = (env: MetricsEnvelope<unknown>) =>
+      this.liveFetchedAt.set(new Date(env.fetchedAt).toLocaleTimeString() + (env.cached ? ' (cached)' : ''));
+
+    if (project.analyticsPropertyId) {
+      pending++;
+      this.projectService.getGa4Metrics(id, this.liveRange(), refresh).subscribe({
+        next: (env) => { this.ga4.set(env.data); stamp(env); done(); },
+        error: (err) => { this.liveError.set(err?.error?.error ?? 'GA4 request failed.'); done(); },
+      });
+    }
+    if (project.searchConsoleUrl) {
+      pending++;
+      this.projectService.getGscMetrics(id, this.liveRange(), refresh).subscribe({
+        next: (env) => { this.gsc.set(env.data); stamp(env); done(); },
+        error: (err) => { this.liveError.set(err?.error?.error ?? 'Search Console request failed.'); done(); },
+      });
+    }
+    if (pending === 0) {
+      this.liveLoading.set(false);
+      this.liveError.set('This project has no GA4 property or Search Console URL configured.');
+    }
   }
 
   private mapProject(p: Project): AHProject {

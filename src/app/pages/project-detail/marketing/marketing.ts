@@ -175,6 +175,7 @@ const CAT_COLORS: Partial<Record<string, string>> = {
                     rel="noopener noreferrer"
                     class="asset-link"
                     [attr.aria-label]="'Open ' + asset.name"
+                    (click)="openAsset(asset, $event)"
                   >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                   </a>
@@ -534,6 +535,37 @@ export class MarketingTab implements OnInit {
       OTHER:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>`,
     };
     return icons[type] ?? icons.OTHER;
+  }
+
+  protected openAsset(asset: { name: string; url: string }, event: MouseEvent) {
+    if (asset.url.startsWith('data:')) {
+      event.preventDefault();
+      const newTab = window.open();
+      if (newTab) {
+        const safeName = asset.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        newTab.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>${safeName}</title>
+              <style>
+                body { margin: 0; background: #0B0F19; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #fff; }
+                img { max-width: 90%; max-height: 85vh; object-fit: contain; box-shadow: 0 10px 30px rgba(0,0,0,0.6); border-radius: 12px; border: 1px solid #1E293B; }
+                .container { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 24px; }
+                .title { font-size: 14px; font-weight: 500; color: #94A3B8; letter-spacing: 0.02em; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="title">${safeName}</div>
+                <img src="${asset.url}" alt="${safeName}" />
+              </div>
+            </body>
+          </html>
+        `);
+        newTab.document.close();
+      }
+    }
   }
 
   protected formatDate(iso: string): string {

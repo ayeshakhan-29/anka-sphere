@@ -13,7 +13,12 @@
                             "target":  "http://localhost:3010",
                             "secure":  false,
                             "logLevel":  "debug"
-                        }
+                        },
+    "/integrations/**":  {
+                             "target":  "http://localhost:3010",
+                             "secure":  false,
+                             "logLevel":  "debug"
+                         }
 }
 
 

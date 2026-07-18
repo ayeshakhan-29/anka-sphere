@@ -1,10 +1,104 @@
 import { Component, signal, computed, inject, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { NotificationService } from '../../services/notification.service';
 import { ProjectService } from '../../services/project.service';
-import { UserRole } from '../../models/project.models';
+import { IntegrationService, OAuthProviderSlug } from '../../services/integration.service';
+import { UserRole, IntegrationInfo, IntegrationProvider } from '../../models/project.models';
 
-type TabId = 'profile' | 'team' | 'notifications';
+type TabId = 'profile' | 'team' | 'integrations' | 'notifications';
+
+interface IntegrationCard {
+  provider: IntegrationProvider;
+  name: string;
+  kind: 'oauth' | 'env';
+  slug?: OAuthProviderSlug;   // for oauth cards
+  envVar?: string;            // for env cards
+  what: string;
+  cost: string;
+  steps: string[];
+}
+
+const INTEGRATION_CARDS: IntegrationCard[] = [
+  {
+    provider: 'GOOGLE_ANALYTICS', name: 'Google (GA4 + Search Console + Ads)', kind: 'oauth', slug: 'google',
+    what: 'Live sessions, users, conversions, search queries and ad campaign data across the Analytics Hub, SEO and Paid departments.',
+    cost: 'Free (Google APIs). ~15 min one-time setup.',
+    steps: [
+      'Go to console.cloud.google.com → create/select a project.',
+      'Enable APIs: "Google Analytics Data API", "Search Console API", "Google Ads API".',
+      'APIs & Services → OAuth consent screen → External → add your users as test users.',
+      'Credentials → Create OAuth client ID → Web application → add the redirect URI shown in your server env (GOOGLE_OAUTH_REDIRECT_URI).',
+      'Copy Client ID/Secret into the server .env (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET), restart, then hit Connect below.',
+      'For Google Ads also request a developer token at ads.google.com → Tools → API Center and set GOOGLE_ADS_DEVELOPER_TOKEN.',
+    ],
+  },
+  {
+    provider: 'META', name: 'Meta (Facebook + Instagram)', kind: 'oauth', slug: 'meta',
+    what: 'Publish posts to FB Pages / IG business accounts and pull ad campaign insights into the Paid department.',
+    cost: 'Free (Graph API). ~20 min setup; app review needed for production publishing.',
+    steps: [
+      'Go to developers.facebook.com → Create App → type "Business".',
+      'Add products: "Facebook Login for Business" and "Marketing API".',
+      'Settings → Basic: copy App ID / App Secret into server .env (META_APP_ID / META_APP_SECRET).',
+      'Facebook Login → Settings → add the /integrations/meta/callback redirect URI.',
+      'Link an Instagram business account to your Facebook Page for IG publishing.',
+      'Restart the server and hit Connect below.',
+    ],
+  },
+  {
+    provider: 'TIKTOK', name: 'TikTok', kind: 'oauth', slug: 'tiktok',
+    what: 'Publish videos via the Content Posting API from the Social department.',
+    cost: 'Free. ~15 min setup; TikTok audits apps before production posting.',
+    steps: [
+      'Go to developers.tiktok.com → Manage apps → Create app.',
+      'Add the "Content Posting API" product and request video.publish / video.upload scopes.',
+      'Copy Client Key / Client Secret into server .env (TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET).',
+      'Register the /integrations/tiktok/callback redirect URI.',
+      'Restart the server and hit Connect below.',
+    ],
+  },
+  {
+    provider: 'OPENAI' as IntegrationProvider, name: 'OpenAI (gpt-image-1 + copy)', kind: 'env', envVar: 'OPENAI_API_KEY',
+    what: 'AI images in the Design tab plus captions, ad copy, page drafts and report drafts.',
+    cost: '~$0.04–0.17/image; fractions of a cent per text generation.',
+    steps: [
+      'Go to platform.openai.com → API keys → Create new secret key.',
+      'Set OPENAI_API_KEY in the server .env and restart. Keys never touch the browser.',
+    ],
+  },
+  {
+    provider: 'STABILITY', name: 'Stability AI (Stable Image Core)', kind: 'env', envVar: 'STABILITY_API_KEY',
+    what: 'Alternative, cheaper image provider in the Design tab picker.',
+    cost: '~$0.03/image (3 credits).',
+    steps: [
+      'Go to platform.stability.ai → Account → API keys → Create.',
+      'Set STABILITY_API_KEY in the server .env and restart. The Design tab picker shows Stability automatically.',
+    ],
+  },
+  {
+    provider: 'RUNWAY', name: 'Runway ML (gen4_turbo video)', kind: 'env', envVar: 'RUNWAY_API_KEY',
+    what: 'AI video generation panel in the Design tab (text/image → 5–10 s video).',
+    cost: '~$0.25–0.50 per 5–10 s video (credits).',
+    steps: [
+      'Go to dev.runwayml.com → create an API key (separate billing from the Runway web app).',
+      'Set RUNWAY_API_KEY in the server .env and restart.',
+    ],
+  },
+  {
+    provider: 'AWS_S3' as IntegrationProvider, name: 'AWS S3 (Image Storage)', kind: 'env', envVar: 'AWS_S3_BUCKET_NAME',
+    what: 'Moves AI-generated images and videos out of the database and stores them in an S3 bucket instead.',
+    cost: 'Free tier / standard S3 pricing (~$0.023/GB).',
+    steps: [
+      'Go to console.aws.amazon.com → S3 → Create bucket.',
+      'Go to IAM → Create user with Programmatic access (copy Access Key ID and Secret Access Key).',
+      'Attach a policy granting S3 read/write access to your user (e.g. AmazonS3FullAccess or custom bucket policy).',
+      'Set environment variables in server .env: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, and AWS_S3_BUCKET_NAME.',
+      'Restart the server.',
+    ],
+  },
+];
 
 interface TeamMember {
   name: string;
@@ -55,7 +149,7 @@ const ROLE_COLOR: Partial<Record<UserRole, string>> = {
 
 @Component({
   selector: 'app-settings',
-  imports: [],
+  imports: [CommonModule],
   template: `
     <div class="settings-page">
 
@@ -70,9 +164,19 @@ const ROLE_COLOR: Partial<Record<UserRole, string>> = {
       <!-- Tabs -->
       <div class="tab-nav" role="tablist" aria-label="Settings sections">
         @for (t of tabs; track t.id) {
-          <button role="tab" class="tab-btn" [class.active]="activeTab() === t.id"
+          <button type="button" role="tab" class="tab-btn" [class.active]="activeTab() === t.id"
             [attr.aria-selected]="activeTab() === t.id" (click)="activeTab.set(t.id)">
-            <span class="tab-icon" [innerHTML]="t.icon" aria-hidden="true"></span>
+            <span class="tab-icon" aria-hidden="true">
+              @if (t.id === 'profile') {
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              } @else if (t.id === 'team') {
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              } @else if (t.id === 'integrations') {
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              } @else if (t.id === 'notifications') {
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              }
+            </span>
             {{ t.label }}
           </button>
         }
@@ -189,6 +293,65 @@ const ROLE_COLOR: Partial<Record<UserRole, string>> = {
             @if (team().length === 0) {
               <div class="empty-state">No team members found. Members appear once assigned to a project.</div>
             }
+          }
+        </div>
+      }
+
+      <!-- Integrations tab -->
+      @if (activeTab() === 'integrations') {
+        <div class="tab-panel">
+          @if (oauthResult()) {
+            <div class="oauth-banner" [class.oauth-err]="oauthResultIsError()" role="status">{{ oauthResult() }}</div>
+          }
+          @if (intLoading()) {
+            <div class="loading-state" role="status"><div class="spinner" aria-hidden="true"></div>Loading integrations…</div>
+          } @else {
+            <div class="int-list" role="list" aria-label="Integrations">
+              @for (card of integrationCards; track card.provider) {
+                <article class="int-card" role="listitem">
+                  <div class="int-head">
+                    <div class="int-title-wrap">
+                      <span class="int-name">{{ card.name }}</span>
+                      <span class="int-status" [attr.data-s]="statusFor(card.provider)">{{ statusLabelFor(card.provider) }}</span>
+                    </div>
+                    <div class="int-actions">
+                      @if (card.kind === 'oauth') {
+                        @if (statusFor(card.provider) === 'CONNECTED') {
+                          <button class="btn-outline-sm" (click)="disconnect(card.slug!)" [disabled]="busySlug() === card.slug">
+                            @if (busySlug() === card.slug) { … } @else { Disconnect }
+                          </button>
+                        } @else if (configuredFor(card.provider)) {
+                          <button class="btn-connect" (click)="connect(card.slug!)" [disabled]="busySlug() === card.slug">
+                            @if (busySlug() === card.slug) { Opening… } @else { Connect }
+                          </button>
+                        } @else {
+                          <span class="int-env-note">Set server env keys first</span>
+                        }
+                      } @else {
+                        <span class="int-env-note">
+                          @if (statusFor(card.provider) === 'CONNECTED') { Configured via server env ({{ card.envVar }}) }
+                          @else { Add {{ card.envVar }} to the server env }
+                        </span>
+                      }
+                    </div>
+                  </div>
+                  @if (accountFor(card.provider); as acct) {
+                    <div class="int-account">Connected as {{ acct }}</div>
+                  }
+                  @if (errorFor(card.provider); as err) {
+                    <div class="int-error" role="alert">{{ err }}</div>
+                  }
+                  <p class="int-what">{{ card.what }}</p>
+                  <p class="int-cost">💰 {{ card.cost }}</p>
+                  <details class="int-guide">
+                    <summary>Click-by-click setup guide</summary>
+                    <ol class="int-steps">
+                      @for (step of card.steps; track $index) { <li>{{ step }}</li> }
+                    </ol>
+                  </details>
+                </article>
+              }
+            </div>
           }
         </div>
       }
@@ -319,6 +482,32 @@ const ROLE_COLOR: Partial<Record<UserRole, string>> = {
     .mp-chip--more { color: var(--color-text-muted); }
     .empty-state { text-align: center; padding: 40px 24px; color: var(--color-text-muted); font-size: 13.5px; border: 1.5px dashed var(--color-border); border-radius: var(--radius-lg); }
 
+    /* Integrations */
+    .oauth-banner { padding: 10px 14px; border-radius: var(--radius-md); background: #ECFDF5; color: #059669; font-size: 13px; font-weight: 500; border: 1px solid #A7F3D0; }
+    .oauth-banner.oauth-err { background: #FEE2E2; color: #DC2626; border-color: #FECACA; }
+    .int-list { display: flex; flex-direction: column; gap: 12px; }
+    .int-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow-card); }
+    .int-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .int-title-wrap { display: flex; align-items: center; gap: 10px; }
+    .int-name { font-size: 14px; font-weight: 600; color: var(--color-text); }
+    .int-status { font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.05em; background: var(--color-surface-raised); color: var(--color-text-muted); }
+    .int-status[data-s="CONNECTED"] { background: #ECFDF5; color: #059669; }
+    .int-status[data-s="ERROR"] { background: #FEE2E2; color: #DC2626; }
+    .int-status[data-s="PENDING"] { background: #FEF3C7; color: #D97706; }
+    .int-actions { display: flex; align-items: center; gap: 8px; }
+    .btn-connect { height: 30px; padding: 0 16px; background: var(--color-accent, #6366F1); color: #fff; border: none; border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+    .btn-connect:disabled { opacity: 0.6; }
+    .btn-outline-sm { height: 30px; padding: 0 14px; background: transparent; color: var(--color-text-secondary); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 12.5px; font-weight: 500; cursor: pointer; }
+    .btn-outline-sm:hover { border-color: #DC2626; color: #DC2626; }
+    .int-env-note { font-size: 12px; color: var(--color-text-muted); font-style: italic; }
+    .int-account { font-size: 12px; color: #059669; font-weight: 500; }
+    .int-error { font-size: 12px; color: #DC2626; }
+    .int-what { font-size: 13px; color: var(--color-text-secondary); margin: 0; line-height: 1.55; }
+    .int-cost { font-size: 12px; color: var(--color-text-muted); margin: 0; }
+    .int-guide summary { font-size: 12.5px; font-weight: 600; color: var(--color-accent, #6366F1); cursor: pointer; }
+    .int-steps { margin: 8px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 5px; }
+    .int-steps li { font-size: 12.5px; color: var(--color-text-secondary); line-height: 1.5; }
+
     /* Notifications */
     .notif-section { display: flex; flex-direction: column; gap: 8px; }
     .notif-section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-muted); }
@@ -361,20 +550,31 @@ export class Settings implements OnInit {
   protected auth         = inject(AuthService);
   protected notifService = inject(NotificationService);
   private projectService = inject(ProjectService);
+  private integrationService = inject(IntegrationService);
+  private route          = inject(ActivatedRoute);
 
   protected activeTab   = signal<TabId>('profile');
   protected team        = signal<TeamMember[]>([]);
   protected projectCount = signal(0);
   protected teamLoading = signal(true);
 
+  // Integrations
+  readonly integrationCards = INTEGRATION_CARDS;
+  protected integrations = signal<IntegrationInfo[]>([]);
+  protected intLoading   = signal(true);
+  protected busySlug     = signal<OAuthProviderSlug | ''>('');
+  protected oauthResult  = signal('');
+  protected oauthResultIsError = signal(false);
+
   protected notifGateEnabled  = signal(true);
   protected notifStageEnabled = signal(true);
   protected notifInfoEnabled  = signal(false);
 
   readonly tabs = [
-    { id: 'profile'       as TabId, label: 'Profile',       icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>` },
-    { id: 'team'          as TabId, label: 'Team',          icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>` },
-    { id: 'notifications' as TabId, label: 'Notifications', icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>` },
+    { id: 'profile'       as TabId, label: 'Profile' },
+    { id: 'team'          as TabId, label: 'Team' },
+    { id: 'integrations'  as TabId, label: 'Integrations' },
+    { id: 'notifications' as TabId, label: 'Notifications' },
   ];
 
   readonly notifPrefs = [
@@ -432,6 +632,22 @@ export class Settings implements OnInit {
   });
 
   ngOnInit() {
+    // OAuth callbacks land on /app/settings?integration=<slug>_<result>
+    const result = this.route.snapshot.queryParamMap.get('integration');
+    if (result) {
+      this.activeTab.set('integrations');
+      const [slug, outcome] = [result.replace(/_[^_]+$/, ''), result.replace(/^.*_/, '')];
+      const name = slug.charAt(0).toUpperCase() + slug.slice(1);
+      if (outcome === 'connected') {
+        this.oauthResult.set(`${name} connected successfully.`);
+        this.oauthResultIsError.set(false);
+      } else {
+        this.oauthResult.set(outcome === 'denied' ? `${name} connection was cancelled.` : `${name} connection failed — check the server logs.`);
+        this.oauthResultIsError.set(true);
+      }
+    }
+    this.loadIntegrations();
+
     this.projectService.getProjects().subscribe({
       next: (projects) => {
         this.projectCount.set(projects.length);
@@ -462,6 +678,60 @@ export class Settings implements OnInit {
 
   protected memberColor(role: string): string {
     return ROLE_COLOR[role as UserRole] ?? '#6366F1';
+  }
+
+  // ── Integrations ──────────────────────────────────────────────────────────
+
+  private loadIntegrations() {
+    this.integrationService.getIntegrations().subscribe({
+      next: (res) => { this.integrations.set(res.integrations); this.intLoading.set(false); },
+      error: () => this.intLoading.set(false),
+    });
+  }
+
+  private infoFor(provider: IntegrationProvider): IntegrationInfo | undefined {
+    return this.integrations().find(i => i.provider === provider);
+  }
+
+  protected statusFor(provider: IntegrationProvider): string {
+    return this.infoFor(provider)?.status ?? 'NOT_CONFIGURED';
+  }
+
+  protected statusLabelFor(provider: IntegrationProvider): string {
+    const s = this.statusFor(provider);
+    return s === 'CONNECTED' ? 'Connected' : s === 'ERROR' ? 'Error' : s === 'PENDING' ? 'Pending' : 'Not configured';
+  }
+
+  protected configuredFor(provider: IntegrationProvider): boolean {
+    return this.infoFor(provider)?.configured ?? false;
+  }
+
+  protected accountFor(provider: IntegrationProvider): string | null {
+    return this.infoFor(provider)?.accountName ?? null;
+  }
+
+  protected errorFor(provider: IntegrationProvider): string | null {
+    return this.infoFor(provider)?.errorMessage ?? null;
+  }
+
+  protected connect(slug: OAuthProviderSlug) {
+    this.busySlug.set(slug);
+    this.integrationService.getAuthUrl(slug).subscribe({
+      next: (res) => { window.location.href = res.url; },
+      error: (err) => {
+        this.oauthResult.set(err?.error?.error ?? 'Could not start the OAuth flow — check the server env keys.');
+        this.oauthResultIsError.set(true);
+        this.busySlug.set('');
+      },
+    });
+  }
+
+  protected disconnect(slug: OAuthProviderSlug) {
+    this.busySlug.set(slug);
+    this.integrationService.disconnect(slug).subscribe({
+      next: () => { this.busySlug.set(''); this.loadIntegrations(); },
+      error: () => this.busySlug.set(''),
+    });
   }
 
   protected memberDept(role: string): string {

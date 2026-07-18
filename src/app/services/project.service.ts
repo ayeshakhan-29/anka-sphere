@@ -25,6 +25,17 @@ import {
   EmailDeliveryUpsert,
   AiUsage,
   AiImageResult,
+  AiVideoCreateResult,
+  AiVideoTaskStatus,
+  AiVideoRatio,
+  MetricsEnvelope,
+  Ga4Metrics,
+  GscMetrics,
+  AdAccountSummary,
+  AdAccountLink,
+  AdNetwork,
+  SocialPost,
+  SocialPostInput,
 } from '../models/project.models';
 
 @Injectable({ providedIn: 'root' })
@@ -370,7 +381,11 @@ export class ProjectService {
   markEmailDeliveryConfigured(projectId: string) {
     return this.api.post<EmailDeliveryProfile>(`/projects/${projectId}/email-delivery/mark-configured`, { configured: true });
   }
-  generateAiImage(projectId: string, data: { prompt: string; size?: string; saveToAssets?: boolean; assetName?: string }) {
+
+  verifyEmailDeliveryDns(projectId: string) {
+    return this.api.post<EmailDeliveryProfile>(`/projects/${projectId}/email-delivery/verify-dns`, {});
+  }
+  generateAiImage(projectId: string, data: { prompt: string; size?: string; model?: string; saveToAssets?: boolean; assetName?: string }) {
     return this.api.post<AiImageResult>(`/projects/${projectId}/design/ai-images`, data);
   }
 
@@ -380,6 +395,18 @@ export class ProjectService {
 
   getAiUsage(projectId: string) {
     return this.api.get<AiUsage>(`/projects/${projectId}/design/ai-usage`);
+  }
+
+  generateAiVideo(projectId: string, data: { prompt: string; duration?: 5 | 10; ratio?: AiVideoRatio; image?: string }) {
+    return this.api.post<AiVideoCreateResult>(`/projects/${projectId}/design/ai-videos`, data);
+  }
+
+  getAiVideoTask(projectId: string, taskId: string) {
+    return this.api.get<AiVideoTaskStatus>(`/projects/${projectId}/design/ai-videos/${taskId}`);
+  }
+
+  saveAiVideoToAssets(projectId: string, taskId: string, data: { assetName?: string } = {}) {
+    return this.api.post<{ asset: DesignAsset }>(`/projects/${projectId}/design/ai-videos/${taskId}/save`, data);
   }
 
   generateAiCaptions(projectId: string, data: { platform: string; topic: string }) {
@@ -404,5 +431,67 @@ export class ProjectService {
     return this.api.post<{ summary: string; highlights: string; blockers: string; nextSteps: string }>(
       `/projects/${projectId}/reports/ai-draft`, { type },
     );
+  }
+
+  // ── Live metrics (GA4 / GSC) ──────────────────────────────────────────────
+
+  getGa4Metrics(projectId: string, range = 30, refresh = false) {
+    return this.api.get<MetricsEnvelope<Ga4Metrics>>(
+      `/projects/${projectId}/analytics/ga4?range=${range}&refresh=${refresh}`,
+    );
+  }
+
+  getGscMetrics(projectId: string, range = 30, refresh = false) {
+    return this.api.get<MetricsEnvelope<GscMetrics>>(
+      `/projects/${projectId}/analytics/gsc?range=${range}&refresh=${refresh}`,
+    );
+  }
+
+  // ── Paid — ad account links + live campaigns ──────────────────────────────
+
+  getAdAccountLinks(projectId: string) {
+    return this.api.get<{ links: AdAccountLink[] }>(`/projects/${projectId}/paid/ad-accounts`);
+  }
+
+  saveAdAccountLink(projectId: string, data: { network: AdNetwork; externalAccountId: string; externalAccountName?: string | null }) {
+    return this.api.put<{ link: AdAccountLink }>(`/projects/${projectId}/paid/ad-accounts`, data);
+  }
+
+  deleteAdAccountLink(projectId: string, network: AdNetwork) {
+    return this.api.delete<{ deleted: boolean }>(`/projects/${projectId}/paid/ad-accounts/${network}`);
+  }
+
+  getGoogleAdsCampaigns(projectId: string, range = 30, refresh = false) {
+    return this.api.get<MetricsEnvelope<AdAccountSummary>>(
+      `/projects/${projectId}/paid/google-ads?range=${range}&refresh=${refresh}`,
+    );
+  }
+
+  getMetaAdsCampaigns(projectId: string, range = 30, refresh = false) {
+    return this.api.get<MetricsEnvelope<AdAccountSummary>>(
+      `/projects/${projectId}/paid/meta-ads?range=${range}&refresh=${refresh}`,
+    );
+  }
+
+  // ── Social posts ──────────────────────────────────────────────────────────
+
+  getSocialPosts(projectId: string) {
+    return this.api.get<{ posts: SocialPost[] }>(`/projects/${projectId}/social/posts`);
+  }
+
+  createSocialPost(projectId: string, data: SocialPostInput) {
+    return this.api.post<{ post: SocialPost }>(`/projects/${projectId}/social/posts`, data);
+  }
+
+  updateSocialPost(projectId: string, postId: string, data: Partial<SocialPostInput>) {
+    return this.api.patch<{ post: SocialPost }>(`/projects/${projectId}/social/posts/${postId}`, data);
+  }
+
+  deleteSocialPost(projectId: string, postId: string) {
+    return this.api.delete<{ deleted: boolean }>(`/projects/${projectId}/social/posts/${postId}`);
+  }
+
+  publishSocialPost(projectId: string, postId: string) {
+    return this.api.post<{ post: SocialPost }>(`/projects/${projectId}/social/posts/${postId}/publish`, {});
   }
 }

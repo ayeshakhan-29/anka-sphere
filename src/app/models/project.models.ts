@@ -429,6 +429,9 @@ export interface EmailDnsRecord {
   priority?: number;
   purpose: 'SPF' | 'DKIM' | 'DMARC' | 'RETURN_PATH' | 'INBOUND';
   required: boolean;
+  /** Present after a verify-dns check */
+  verified?: boolean;
+  actual?: string | null;
 }
 
 export interface EmailDeliverySettings {
@@ -450,6 +453,8 @@ export interface EmailDeliveryProfile {
   dnsRecords: EmailDnsRecord[];
   estimatedSetupMinutes: number;
   activeFrom: string | null;
+  /** Present on verify-dns responses */
+  allRequiredVerified?: boolean;
 }
 
 export interface EmailDeliveryUpsert {
@@ -484,4 +489,148 @@ export interface AiImageResult {
   revisedPrompt: string | null;
   costUsd: number;
   asset: DesignAsset | null;
+}
+
+export type AiImageModel = 'openai' | 'stability';
+
+// ── AI video (Runway gen4_turbo — async task API) ─────────────────────────────
+
+export type AiVideoRatio = '1280:720' | '720:1280' | '960:960';
+
+export interface AiVideoCreateResult {
+  taskId: string;
+  costUsd: number;
+}
+
+export type AiVideoTaskState = 'PENDING' | 'THROTTLED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
+
+export interface AiVideoTaskStatus {
+  status: AiVideoTaskState;
+  progress: number;        // 0–1
+  videoUrl: string | null; // ephemeral Runway URL for preview
+  failure: string | null;
+}
+
+// ── Integrations ──────────────────────────────────────────────────────────────
+
+export type IntegrationProvider =
+  | 'OPENAI'
+  | 'GOOGLE_ANALYTICS'
+  | 'GOOGLE_SEARCH_CONSOLE'
+  | 'GOOGLE_ADS'
+  | 'META'
+  | 'TIKTOK'
+  | 'STABILITY'
+  | 'RUNWAY'
+  | 'AWS_S3';
+
+export type IntegrationStatus = 'NOT_CONFIGURED' | 'PENDING' | 'CONNECTED' | 'ERROR';
+
+export interface IntegrationInfo {
+  provider: IntegrationProvider;
+  kind: 'oauth' | 'env';
+  status: IntegrationStatus;
+  configured: boolean;
+  accountName: string | null;
+  connectedAt: string | null;
+  lastSyncedAt: string | null;
+  errorMessage: string | null;
+}
+
+// ── Live metrics (GA4 / GSC / Ads) ───────────────────────────────────────────
+
+export interface MetricsEnvelope<T> {
+  data: T;
+  fetchedAt: string;
+  cached: boolean;
+}
+
+export interface Ga4Metrics {
+  propertyId: string;
+  rangeDays: number;
+  sessions: number;
+  totalUsers: number;
+  newUsers: number;
+  conversions: number;
+  engagementRate: number;
+  averageSessionDuration: number;
+  topPages: Array<{ path: string; sessions: number; users: number }>;
+  sessionsByDay: Array<{ date: string; sessions: number }>;
+}
+
+export interface GscMetrics {
+  siteUrl: string;
+  rangeDays: number;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  avgPosition: number;
+  topQueries: Array<{ query: string; clicks: number; impressions: number; ctr: number; position: number }>;
+  topPages: Array<{ page: string; clicks: number; impressions: number }>;
+}
+
+export interface AdCampaign {
+  id: string;
+  name: string;
+  status: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  ctr: number;
+  cpc: number;
+}
+
+export interface AdAccountSummary {
+  accountId: string;
+  rangeDays: number;
+  totals: { spend: number; impressions: number; clicks: number; conversions: number };
+  campaigns: AdCampaign[];
+}
+
+export type AdNetwork = 'GOOGLE' | 'META';
+
+export interface AdAccountLink {
+  id: string;
+  projectId: string;
+  network: AdNetwork;
+  externalAccountId: string;
+  externalAccountName: string | null;
+  externalCampaignIds: string[] | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Social posts ─────────────────────────────────────────────────────────────
+
+export type SocialPlatform = 'INSTAGRAM' | 'TIKTOK' | 'FACEBOOK' | 'LINKEDIN' | 'X';
+export type SocialPostStatus = 'DRAFT' | 'SCHEDULED' | 'PUBLISHING' | 'PUBLISHED' | 'FAILED';
+
+export interface SocialPost {
+  id: string;
+  projectId: string;
+  platform: SocialPlatform;
+  caption: string;
+  hashtags: string | null;
+  mediaAssetId: string | null;
+  mediaAsset: { id: string; name: string; type: string; url: string; thumbnailUrl: string | null } | null;
+  scheduledAt: string | null;
+  status: SocialPostStatus;
+  externalPostId: string | null;
+  externalUrl: string | null;
+  errorMessage: string | null;
+  publishedAt: string | null;
+  createdByName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SocialPostInput {
+  platform: SocialPlatform;
+  caption: string;
+  hashtags?: string | null;
+  mediaAssetId?: string | null;
+  scheduledAt?: string | null;
+  status?: 'DRAFT' | 'SCHEDULED';
+  createdByName?: string | null;
 }

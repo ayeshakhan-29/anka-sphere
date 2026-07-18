@@ -490,6 +490,9 @@ interface PastReport {
                 <button type="button" class="btn-primary-sm" (click)="saveEmailDelivery()" [disabled]="deliverySaving()">
                   @if (deliverySaving()) { Saving... } @else { Generate DNS Records }
                 </button>
+                <button type="button" class="btn-send" (click)="verifyDeliveryDns()" [disabled]="!emailDelivery()?.settings || deliveryChecking()">
+                  @if (deliveryChecking()) { Checking DNS... } @else { Verify DNS }
+                </button>
                 <button type="button" class="btn-outline" (click)="markDeliveryConfigured()" [disabled]="!emailDelivery()?.settings || emailDelivery()?.settings?.status === 'ACTIVE' || deliveryVerifying()">
                   @if (deliveryVerifying()) { Activating... } @else { Mark DNS Configured }
                 </button>
@@ -510,6 +513,7 @@ interface PastReport {
                     <span role="columnheader">Host</span>
                     <span role="columnheader">Value</span>
                     <span role="columnheader">Purpose</span>
+                    <span role="columnheader">Status</span>
                   </div>
                   @for (record of deliveryRecords(); track record.type + record.host + record.value) {
                     <div class="dns-row" role="row">
@@ -517,6 +521,21 @@ interface PastReport {
                       <code role="cell">{{ record.host }}</code>
                       <code role="cell" class="dns-value">{{ record.priority ? record.priority + ' ' : '' }}{{ record.value }}</code>
                       <span role="cell">{{ record.purpose }} @if (record.required) { <span class="required-dot">Required</span> }</span>
+                      <span role="cell">
+                        @if (record.verified === true) {
+                          <span class="dns-check dns-check--pass" [attr.title]="record.actual">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                            Verified
+                          </span>
+                        } @else if (record.verified === false) {
+                          <span class="dns-check dns-check--fail" [attr.title]="record.actual ? 'Found: ' + record.actual : 'No record found'">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            Not found
+                          </span>
+                        } @else {
+                          <span class="dns-check dns-check--unknown">Not checked</span>
+                        }
+                      </span>
                     </div>
                   }
                 </div>
@@ -1040,7 +1059,7 @@ interface PastReport {
     .dns-table { display: flex; flex-direction: column; }
     .dns-head, .dns-row {
       display: grid;
-      grid-template-columns: 70px 150px minmax(240px, 1fr) 160px;
+      grid-template-columns: 70px 150px minmax(200px, 1fr) 140px 110px;
       gap: 12px;
       align-items: center;
     }
@@ -1086,6 +1105,20 @@ interface PastReport {
       font-size: 11px;
       font-weight: 700;
     }
+    .dns-check {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      height: 22px;
+      padding: 0 8px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .dns-check--pass    { background: rgba(22,163,74,0.1); color: #15803D; }
+    .dns-check--fail    { background: rgba(220,38,38,0.1); color: #DC2626; }
+    .dns-check--unknown { background: var(--color-surface-raised); color: var(--color-text-muted); border: 1px solid var(--color-border); }
     .send-input {
       height: 34px; min-width: 260px; padding: 0 12px;
       border: 1px solid var(--color-border); border-radius: 8px;
@@ -1147,6 +1180,7 @@ export class ReportingTab implements OnInit {
   protected deliveryLoading   = signal(false);
   protected deliverySaving    = signal(false);
   protected deliveryVerifying = signal(false);
+  protected deliveryChecking  = signal(false);
   protected deliveryMessage   = signal<string | null>(null);
   protected deliveryError     = signal<string | null>(null);
   private weeklyReportId: string | null = null;
@@ -1338,6 +1372,30 @@ export class ReportingTab implements OnInit {
       error: (err) => {
         this.deliverySaving.set(false);
         this.deliveryError.set(err?.error?.error ?? 'Could not save email delivery settings.');
+      },
+    });
+  }
+
+  protected verifyDeliveryDns() {
+    const pid = this.projectId;
+    if (!pid) return;
+    this.deliveryChecking.set(true);
+    this.deliveryError.set(null);
+    this.deliveryMessage.set(null);
+    this.projectService.verifyEmailDeliveryDns(pid).subscribe({
+      next: (profile) => {
+        this.emailDelivery.set(profile);
+        this.deliveryChecking.set(false);
+        if (profile.allRequiredVerified) {
+          this.deliveryMessage.set('All required DNS records verified — email delivery is active.');
+        } else {
+          const failing = profile.dnsRecords.filter(r => r.required && r.verified === false).length;
+          this.deliveryError.set(`${failing} required DNS record${failing === 1 ? '' : 's'} not found yet. DNS changes can take up to a few hours to propagate.`);
+        }
+      },
+      error: (err) => {
+        this.deliveryChecking.set(false);
+        this.deliveryError.set(err?.error?.error ?? 'DNS check failed. Please try again.');
       },
     });
   }

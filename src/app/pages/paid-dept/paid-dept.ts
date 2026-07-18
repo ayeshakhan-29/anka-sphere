@@ -1,10 +1,12 @@
 import { Component, signal, computed, inject, OnInit } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Badge } from '../../ui';
 import { ProjectService } from '../../services/project.service';
-import { Project } from '../../models/project.models';
+import { IntegrationService } from '../../services/integration.service';
+import { Project, AdAccountSummary, AdAccountLink, AdNetwork } from '../../models/project.models';
 
-type TabId = 'projects' | 'budget' | 'adcopy' | 'tasks';
+type TabId = 'projects' | 'live' | 'budget' | 'adcopy' | 'tasks';
 
 interface PaidProject {
   id: string; name: string; client: string; clientInitials: string;
@@ -20,7 +22,7 @@ interface PaidTask {
 
 @Component({
   selector: 'app-paid-dept',
-  imports: [RouterLink, Badge],
+  imports: [RouterLink, Badge, DecimalPipe],
   template: `
     <div class="pm-page">
 
@@ -98,6 +100,79 @@ interface PaidTask {
               <div class="empty-state">No projects in paid marketing stage.</div>
             }
           </div>
+        }
+
+        <!-- Live Campaigns tab -->
+        @if (activeTab() === 'live') {
+          <div class="live-controls">
+            <select class="adcopy-select" [value]="liveProjectId()" (change)="selectLiveProject($any($event.target).value)" aria-label="Project">
+              <option value="">— Select project —</option>
+              @for (p of projects(); track p.id) { <option [value]="p.id">{{ p.name }}</option> }
+            </select>
+            @if (liveProjectId()) {
+              <button class="ftab" (click)="loadCampaigns(true)" [disabled]="liveLoading()">↻ Refresh</button>
+            }
+          </div>
+
+          @if (!liveProjectId()) {
+            <div class="empty-state">Pick a project to see its live campaigns. Manual budget entry (Budget & Strategy tab) stays available as a fallback.</div>
+          } @else {
+            <!-- Ad account links -->
+            <div class="link-cards">
+              @for (net of networks; track net.value) {
+                <div class="link-card">
+                  <div class="link-head">
+                    <span class="link-name">{{ net.label }}</span>
+                    @if (linkFor(net.value); as link) {
+                      <ui-badge variant="success">Linked</ui-badge>
+                    } @else {
+                      <ui-badge variant="default">Not linked</ui-badge>
+                    }
+                  </div>
+                  @if (linkFor(net.value); as link) {
+                    <span class="link-account">{{ link.externalAccountName || link.externalAccountId }}</span>
+                    <button class="ftab" (click)="unlinkAccount(net.value)">Unlink</button>
+                  } @else if (net.connected) {
+                    <input class="link-input" type="text" [placeholder]="net.placeholder"
+                      [value]="linkDraft()[net.value]" (input)="setLinkDraft(net.value, $any($event.target).value)" />
+                    <button class="btn-generate" (click)="linkAccount(net.value)" [disabled]="!linkDraft()[net.value].trim()">Link account</button>
+                  } @else {
+                    <p class="link-hint">Connect {{ net.label }} in <a routerLink="/app/settings">Settings → Integrations</a> first.</p>
+                  }
+                </div>
+              }
+            </div>
+
+            @if (liveLoading()) {
+              <div class="loading-state" role="status"><div class="spinner" aria-hidden="true"></div>Fetching campaigns…</div>
+            } @else if (liveError()) {
+              <div class="adcopy-error" role="alert">{{ liveError() }}</div>
+            }
+
+            @for (block of campaignBlocks(); track block.label) {
+              <h3 class="live-h">{{ block.label }} — last {{ block.data.rangeDays }} days</h3>
+              <div class="kpi-strip">
+                <div class="kpi-card"><div><div class="kpi-val">{{ block.data.totals.spend | number:'1.2-2' }}</div><div class="kpi-lbl">Spend</div></div></div>
+                <div class="kpi-card"><div><div class="kpi-val">{{ block.data.totals.impressions | number }}</div><div class="kpi-lbl">Impressions</div></div></div>
+                <div class="kpi-card"><div><div class="kpi-val">{{ block.data.totals.clicks | number }}</div><div class="kpi-lbl">Clicks</div></div></div>
+                <div class="kpi-card"><div><div class="kpi-val">{{ block.data.totals.conversions | number:'1.0-1' }}</div><div class="kpi-lbl">Conversions</div></div></div>
+              </div>
+              <div class="camp-table">
+                <div class="camp-head"><span>Campaign</span><span>Status</span><span>Spend</span><span>Clicks</span><span>Conv.</span></div>
+                @for (c of block.data.campaigns; track c.id) {
+                  <div class="camp-row">
+                    <span class="camp-name">{{ c.name }}</span>
+                    <span class="camp-status" [attr.data-s]="c.status">{{ c.status }}</span>
+                    <span>{{ c.spend | number:'1.2-2' }}</span>
+                    <span>{{ c.clicks | number }}</span>
+                    <span>{{ c.conversions | number:'1.0-1' }}</span>
+                  </div>
+                } @empty {
+                  <div class="camp-row"><span class="camp-name">No campaigns in this window.</span></div>
+                }
+              </div>
+            }
+          }
         }
 
         <!-- Budget & Strategy tab -->
@@ -345,6 +420,29 @@ interface PaidTask {
     .task-status[data-s="DONE"] { background: #ECFDF5; color: #059669; }
     .task-status[data-s="IN_PROGRESS"] { background: #EFF6FF; color: #2563EB; }
     .task-status[data-s="IN_REVIEW"] { background: #FEF3C7; color: #D97706; }
+
+    /* Live campaigns */
+    .live-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .live-h { font-size: 14px; font-weight: 600; color: var(--color-text); margin: 8px 0 0; }
+    .link-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 800px) { .link-cards { grid-template-columns: 1fr; } }
+    .link-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+    .link-head { display: flex; align-items: center; justify-content: space-between; }
+    .link-name { font-size: 13px; font-weight: 600; color: var(--color-text); }
+    .link-account { font-size: 12.5px; color: var(--color-text-secondary); }
+    .link-input { height: 32px; padding: 0 10px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 12.5px; color: var(--color-text); background: var(--color-surface); outline: none; }
+    .link-input:focus { border-color: #EF4444; }
+    .link-hint { font-size: 12px; color: var(--color-text-muted); margin: 0; }
+    .link-hint a { color: #EF4444; }
+    .camp-table { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; }
+    .camp-head, .camp-row { display: grid; grid-template-columns: 1fr 90px 90px 80px 70px; gap: 10px; padding: 8px 14px; align-items: center; }
+    .camp-head { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-muted); border-bottom: 1px solid var(--color-border); }
+    .camp-row { font-size: 12.5px; color: var(--color-text); border-bottom: 1px solid var(--color-border); }
+    .camp-row:last-child { border-bottom: none; }
+    .camp-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+    .camp-status { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: var(--color-surface-raised); color: var(--color-text-muted); text-align: center; }
+    .camp-status[data-s="ENABLED"], .camp-status[data-s="ACTIVE"] { background: #ECFDF5; color: #059669; }
+    .camp-status[data-s="PAUSED"] { background: #FEF3C7; color: #D97706; }
   `]
 })
 export class PaidDept implements OnInit {
@@ -358,10 +456,109 @@ export class PaidDept implements OnInit {
 
   readonly tabs = [
     { id: 'projects' as TabId, label: 'Projects',            count: computed(() => this.projects().length) },
+    { id: 'live'     as TabId, label: 'Live Campaigns',      count: computed(() => 0) },
     { id: 'budget'   as TabId, label: 'Budget & Strategy',   count: computed(() => this.projects().filter(p => !!p.budget).length) },
     { id: 'adcopy'   as TabId, label: 'Ad Copy',             count: computed(() => 0) },
     { id: 'tasks'    as TabId, label: 'Tasks',               count: computed(() => this.allTasks().length) },
   ];
+
+  // ── Live campaigns ─────────────────────────────────────────────────────────
+  private integrationService = inject(IntegrationService);
+  protected googleAdsConnected = signal(false);
+  protected metaConnected      = signal(false);
+  protected liveProjectId = signal('');
+  protected liveLoading   = signal(false);
+  protected liveError     = signal('');
+  protected adLinks       = signal<AdAccountLink[]>([]);
+  protected googleData    = signal<AdAccountSummary | null>(null);
+  protected metaData      = signal<AdAccountSummary | null>(null);
+  protected linkDraft     = signal<Record<AdNetwork, string>>({ GOOGLE: '', META: '' });
+
+  protected get networks() {
+    return [
+      { value: 'GOOGLE' as AdNetwork, label: 'Google Ads', connected: this.googleAdsConnected(), placeholder: 'Customer ID, e.g. 123-456-7890' },
+      { value: 'META'   as AdNetwork, label: 'Meta Ads',   connected: this.metaConnected(),      placeholder: 'Ad account ID, e.g. act_1234567890' },
+    ];
+  }
+
+  protected campaignBlocks = computed(() => {
+    const blocks: Array<{ label: string; data: AdAccountSummary }> = [];
+    const g = this.googleData();
+    const m = this.metaData();
+    if (g) blocks.push({ label: 'Google Ads', data: g });
+    if (m) blocks.push({ label: 'Meta Ads', data: m });
+    return blocks;
+  });
+
+  protected linkFor(network: AdNetwork): AdAccountLink | undefined {
+    return this.adLinks().find(l => l.network === network);
+  }
+
+  protected setLinkDraft(network: AdNetwork, value: string) {
+    this.linkDraft.update(d => ({ ...d, [network]: value }));
+  }
+
+  protected selectLiveProject(id: string) {
+    this.liveProjectId.set(id);
+    this.googleData.set(null); this.metaData.set(null);
+    this.adLinks.set([]); this.liveError.set('');
+    if (!id) return;
+    this.projectService.getAdAccountLinks(id).subscribe({
+      next: (res) => { this.adLinks.set(res.links); if (res.links.length) this.loadCampaigns(false); },
+      error: () => {},
+    });
+  }
+
+  protected linkAccount(network: AdNetwork) {
+    const id = this.liveProjectId();
+    const accountId = this.linkDraft()[network].trim();
+    if (!id || !accountId) return;
+    this.projectService.saveAdAccountLink(id, { network, externalAccountId: accountId }).subscribe({
+      next: (res) => {
+        this.adLinks.update(links => [...links.filter(l => l.network !== network), res.link]);
+        this.setLinkDraft(network, '');
+        this.loadCampaigns(false);
+      },
+      error: (err) => this.liveError.set(err?.error?.error ?? 'Could not link the ad account.'),
+    });
+  }
+
+  protected unlinkAccount(network: AdNetwork) {
+    const id = this.liveProjectId();
+    if (!id) return;
+    this.projectService.deleteAdAccountLink(id, network).subscribe({
+      next: () => {
+        this.adLinks.update(links => links.filter(l => l.network !== network));
+        if (network === 'GOOGLE') this.googleData.set(null); else this.metaData.set(null);
+      },
+      error: () => {},
+    });
+  }
+
+  protected loadCampaigns(refresh: boolean) {
+    const id = this.liveProjectId();
+    if (!id) return;
+    this.liveError.set('');
+    this.liveLoading.set(true);
+    let pending = 0;
+    const done = () => { if (--pending === 0) this.liveLoading.set(false); };
+
+    if (this.linkFor('GOOGLE')) {
+      pending++;
+      this.projectService.getGoogleAdsCampaigns(id, 30, refresh).subscribe({
+        next: (env) => { this.googleData.set(env.data); done(); },
+        error: (err) => { this.liveError.set(err?.error?.error ?? 'Google Ads request failed.'); done(); },
+      });
+    }
+    if (this.linkFor('META')) {
+      pending++;
+      this.projectService.getMetaAdsCampaigns(id, 30, refresh).subscribe({
+        next: (env) => { this.metaData.set(env.data); done(); },
+        error: (err) => { this.liveError.set(err?.error?.error ?? 'Meta Ads request failed.'); done(); },
+      });
+    }
+    if (pending === 0) this.liveLoading.set(false);
+  }
 
   // AI ad copy
   protected adProjectId    = signal('');
@@ -427,6 +624,13 @@ export class PaidDept implements OnInit {
   });
 
   ngOnInit() {
+    this.integrationService.getIntegrations().subscribe({
+      next: (res) => {
+        this.googleAdsConnected.set(res.integrations.some(i => i.provider === 'GOOGLE_ADS' && i.status === 'CONNECTED'));
+        this.metaConnected.set(res.integrations.some(i => i.provider === 'META' && i.status === 'CONNECTED'));
+      },
+      error: () => {},
+    });
     this.projectService.getProjects().subscribe({
       next: (projects) => {
         const active = projects.filter(p => p.currentStage === 'MARKETING' || !!p.marketing);

@@ -1,6 +1,6 @@
 # Anka Sphere — Scope & Status
 
-_Updated: 6 July 2026 · Legend: ✅ done · 🟡 partial · ⬜ not started_
+_Updated: 16 July 2026 · Legend: ✅ done · 🟡 partial · ⬜ not started_
 
 Client projects flow through a 5-stage delivery pipeline across 3 departments.
 
@@ -25,7 +25,7 @@ Client projects flow through a 5-stage delivery pipeline across 3 departments.
 - ✅ Hard Gate
 - ✅ _Bonus:_ AI first-draft page copy + SEO meta (✨ AI Draft button)
 
-### 1c. Design — 🟡 nearly complete
+### 1c. Design — ✅ complete
 - ✅ Design brief + style guide
 - ✅ Asset library with versioning and approval
 - ✅ Figma inline embed
@@ -33,8 +33,8 @@ Client projects flow through a 5-stage delivery pipeline across 3 departments.
 - ✅ AI image generation — gpt-image-1 (DALL-E 3 was retired by OpenAI)
 - ✅ _Bonus:_ regenerate + edit/refine generated images, unsaved-image protection
 - ✅ API usage tracker (images + AI copywriting, per-call cost logging)
-- ⬜ Stability AI (needs API key — open decision #2)
-- ⬜ AI video generation (needs Runway ML account — open decision #3)
+- ✅ Stability AI (implemented behind credentials — open decision #2)
+- ✅ AI video generation (implemented behind credentials — open decision #3)
 
 ---
 
@@ -53,10 +53,10 @@ Client projects flow through a 5-stage delivery pipeline across 3 departments.
 
 ## Dept 3 — Product Growth (Stage 5)
 
-### Analytics Hub — 🟡
+### Analytics Hub — ✅ complete
 - ✅ Cross-project command centre (pipeline funnel, task breakdown)
 - ✅ Unified reports (via Reporting module)
-- ⬜ GA4 + Google Search Console OAuth (needs Google Cloud project — open decision #1)
+- ✅ GA4 + Google Search Console OAuth (implemented behind credentials — open decision #1)
 
 ### Content Marketing — 🟡
 - ✅ Content pipeline (Draft / In Review / Approved) across projects
@@ -70,21 +70,21 @@ Client projects flow through a 5-stage delivery pipeline across 3 departments.
 - ✅ AI caption writer (writes both variants in the client's stored brand voice)
 - ✅ Content calendar
 - ✅ Hashtag sets (5 industry presets + AI suggestions, one-click insert)
-- 🟡 Scheduling — internal planning only; ⬜ direct publishing APIs (needs Meta/TikTok apps — open decision #4)
+- 🟡 Scheduling — internal planning only; ✅ direct publishing APIs (implemented behind credentials — open decision #4)
 - ⬜ Community queue, ⬜ performance tracker (need platform APIs)
 
 ### Paid Marketing — 🟡
 - ✅ Campaign / budget & strategy view per project
 - ✅ Ad copy variants — AI generated, Google (6×30 + 4×90) and Meta formats with live char counts
-- 🟡 Budget tracking — manual entry (live API data = open decision #5)
-- ⬜ Google Ads API, ⬜ Meta Ads API (need ad accounts + developer tokens)
+- 🟡 Budget tracking — manual entry (live API data implemented behind credentials — open decision #5)
+- ✅ Google Ads API, ✅ Meta Ads API (implemented behind credentials)
 - ⬜ Ad creative library, ⬜ conversion tracking log
 
 ### SEO — 🟡
 - ✅ Keyword strategy board (primary / secondary)
 - ✅ On-page tracker with missing-meta detection
 - ✅ SEO task board
-- ⬜ GSC / GA4 integration, ⬜ backlink tracker, ⬜ rank tracker (need APIs)
+- ✅ GSC / GA4 integration (implemented behind credentials), ⬜ backlink tracker, ⬜ rank tracker (need APIs)
 
 ---
 
@@ -123,11 +123,11 @@ Client projects flow through a 5-stage delivery pipeline across 3 departments.
 ## Open Decisions (from the original doc)
 | # | Decision | Status |
 |---|----------|--------|
-| 1 | GA4/GSC OAuth: shared or per-client Google Cloud project | ⏳ open — blocks analytics integration |
-| 2 | AI image: DALL-E 3 only or + Stability | Resolved by events: gpt-image-1 (DALL-E retired); Stability still optional |
-| 3 | Runway ML credit tier | ⏳ open |
-| 4 | Social scheduling: direct API in v1 or v2 | ⏳ open — calendar is ready either way |
-| 5 | Google/Meta Ads live data vs manual entry | Currently manual; live = needs accounts |
+| 1 | GA4/GSC OAuth: shared or per-client Google Cloud project | ✅ Resolved: Implemented behind credentials |
+| 2 | AI image: DALL-E 3 only or + Stability | ✅ Resolved: Stability integration implemented |
+| 3 | Runway ML credit tier | ✅ Resolved: Runway integration implemented |
+| 4 | Social scheduling: direct API in v1 or v2 | ✅ Resolved: Direct publishing APIs implemented |
+| 5 | Google/Meta Ads live data vs manual entry | ✅ Resolved: Live campaign API data implemented |
 | 6 | Hard Gate: UI-blocked or advisory | ✅ Decided: Hard Gates block, Soft Gates warn |
 | 7 | WP environments: Dev+Staging+Prod or Staging+Prod | ✅ Decided: Staging + Production |
 
