@@ -531,9 +531,6 @@ export class AnalyticsHub implements OnInit {
       next: (projects) => {
         this.allProjects.set(projects);
         this.loading.set(false);
-        if (projects.length > 0) {
-          this.router.navigate(['/app/projects', projects[0].id, 'analytics']);
-        }
       },
       error: () => this.loading.set(false),
     });
