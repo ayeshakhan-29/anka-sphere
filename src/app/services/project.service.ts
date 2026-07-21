@@ -494,4 +494,31 @@ export class ProjectService {
   publishSocialPost(projectId: string, postId: string) {
     return this.api.post<{ post: SocialPost }>(`/projects/${projectId}/social/posts/${postId}/publish`, {});
   }
+
+  // ── Per-project Google Credentials ────────────────────────────────────────
+
+  getProjectGoogleCredentials(projectId: string) {
+    return this.api.get<{
+      analyticsPropertyId: string;
+      searchConsoleUrl: string;
+      googleAdsAccountId: string;
+      hasClientId: boolean;
+      hasClientSecret: boolean;
+      hasDeveloperToken: boolean;
+      status: string;
+      connectedAt: string | null;
+      maskedClientId: string | null;
+    }>(`/projects/${projectId}/google-credentials`);
+  }
+
+  saveProjectGoogleCredentials(projectId: string, data: {
+    clientId?: string;
+    clientSecret?: string;
+    developerToken?: string;
+    analyticsPropertyId?: string;
+    searchConsoleUrl?: string;
+    googleAdsAccountId?: string;
+  }) {
+    return this.api.post<{ success: boolean; status: string }>(`/projects/${projectId}/google-credentials`, data);
+  }
 }

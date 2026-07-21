@@ -1,6 +1,9 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  test: {
+    environment: 'jsdom',
+  },
   plugins: [
     {
       name: 'fix-parentheses-glob',

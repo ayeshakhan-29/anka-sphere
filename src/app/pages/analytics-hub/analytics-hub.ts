@@ -1,6 +1,6 @@
 import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { RouterLink, Router } from '@angular/router';
 import { Badge } from '../../ui';
 import { ProjectService } from '../../services/project.service';
 import { IntegrationService } from '../../services/integration.service';
@@ -524,9 +524,17 @@ export class AnalyticsHub implements OnInit {
     );
   });
 
+  private router = inject(Router);
+
   ngOnInit() {
     this.projectService.getProjects().subscribe({
-      next: (projects) => { this.allProjects.set(projects); this.loading.set(false); },
+      next: (projects) => {
+        this.allProjects.set(projects);
+        this.loading.set(false);
+        if (projects.length > 0) {
+          this.router.navigate(['/app/projects', projects[0].id, 'analytics']);
+        }
+      },
       error: () => this.loading.set(false),
     });
     this.integrationService.getIntegrations().subscribe({

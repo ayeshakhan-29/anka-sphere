@@ -39,6 +39,137 @@ const CAT_COLORS: Partial<Record<string, string>> = {
         }
       </div>
 
+      <!-- ── Tab: Google Integration & Live Metrics ── -->
+      @if (activeTab() === 'analytics') {
+        <section class="tab-panel" aria-label="Google Integration & Live Metrics">
+          
+          <!-- Integration Credentials Form -->
+          <div class="creds-card">
+            <div class="creds-header">
+              <div>
+                <h3 class="creds-title">Project Google Integration & Credentials</h3>
+                <p class="creds-sub">Set project-specific Google Client ID, Secret, Ads Developer Token, and GA4 Property ID.</p>
+              </div>
+            </div>
+
+            <form [formGroup]="googleForm" (ngSubmit)="saveGoogleCredentials()" class="brief-form">
+              <div class="form-grid">
+                <div class="field">
+                  <div class="field-link-wrap">
+                    <label class="field-label" for="g-client-id">Google Client ID</label>
+                    <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" class="field-help-link">Create one →</a>
+                  </div>
+                  <input id="g-client-id" class="field-input" type="text" formControlName="clientId" placeholder="xxxx.apps.googleusercontent.com" />
+                </div>
+                <div class="field">
+                  <div class="field-link-wrap">
+                    <label class="field-label" for="g-client-secret">Google Client Secret</label>
+                    <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" class="field-help-link">Find secret →</a>
+                  </div>
+                  <input id="g-client-secret" class="field-input" type="password" formControlName="clientSecret" placeholder="••••••••••••••••" />
+                </div>
+                <div class="field">
+                  <div class="field-link-wrap">
+                    <label class="field-label" for="g-dev-token">Google Ads Developer Token</label>
+                    <a href="https://ads.google.com/home/tools/manager-accounts/" target="_blank" rel="noopener" class="field-help-link">Create one →</a>
+                  </div>
+                  <input id="g-dev-token" class="field-input" type="password" formControlName="developerToken" placeholder="Developer Token" />
+                </div>
+                <div class="field">
+                  <div class="field-link-wrap">
+                    <label class="field-label" for="g-ads-id">Google Ads Customer Account ID</label>
+                    <a href="https://ads.google.com/aw/overview" target="_blank" rel="noopener" class="field-help-link">Find Account ID →</a>
+                  </div>
+                  <input id="g-ads-id" class="field-input" type="text" formControlName="googleAdsAccountId" placeholder="e.g. 123-456-7890" />
+                </div>
+                <div class="field">
+                  <div class="field-link-wrap">
+                    <label class="field-label" for="g-ga4-id">GA4 Property ID</label>
+                    <a href="https://analytics.google.com/analytics/web/#/provision" target="_blank" rel="noopener" class="field-help-link">Create Property →</a>
+                  </div>
+                  <input id="g-ga4-id" class="field-input" type="text" formControlName="analyticsPropertyId" placeholder="e.g. 123456789" />
+                </div>
+                <div class="field">
+                  <div class="field-link-wrap">
+                    <label class="field-label" for="g-gsc-url">Search Console Property URL</label>
+                    <a href="https://search.google.com/search-console/welcome" target="_blank" rel="noopener" class="field-help-link">Create Site →</a>
+                  </div>
+                  <input id="g-gsc-url" class="field-input" type="text" formControlName="searchConsoleUrl" placeholder="https://clientdomain.com" />
+                </div>
+              </div>
+              <div class="form-footer">
+                @if (credsSuccess()) {
+                  <span class="save-ok" role="status">Credentials Saved & Connected!</span>
+                }
+                <button class="btn-primary" type="submit" [disabled]="savingCreds()">
+                  {{ savingCreds() ? 'Saving…' : 'Save & Connect Credentials' }}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Live Dashboards -->
+          <div class="live-section">
+            <div class="live-header">
+              <h3 class="live-title">Live Metrics & Performance</h3>
+              <button class="ftab" (click)="loadLiveMetrics()" [disabled]="liveLoading()">↻ Refresh Metrics</button>
+            </div>
+
+            @if (liveLoading()) {
+              <div class="loading-state"><div class="spinner"></div> Fetching live project data…</div>
+            } @else {
+              <!-- GA4 Card -->
+              @if (ga4Metrics()) {
+                <div class="live-card">
+                  <h4 class="live-card-h">Google Analytics 4 — Last {{ ga4Metrics()!.rangeDays }} Days</h4>
+                  <div class="kpi-grid">
+                    <div class="kpi-box"><span class="kpi-num">{{ ga4Metrics()!.sessions }}</span><span class="kpi-lbl">Sessions</span></div>
+                    <div class="kpi-box"><span class="kpi-num">{{ ga4Metrics()!.totalUsers }}</span><span class="kpi-lbl">Total Users</span></div>
+                    <div class="kpi-box"><span class="kpi-num">{{ ga4Metrics()!.conversions }}</span><span class="kpi-lbl">Conversions</span></div>
+                    <div class="kpi-box"><span class="kpi-num">{{ (ga4Metrics()!.engagementRate * 100).toFixed(1) }}%</span><span class="kpi-lbl">Engagement Rate</span></div>
+                  </div>
+                </div>
+              }
+
+              <!-- Search Console Card -->
+              @if (gscMetrics()) {
+                <div class="live-card">
+                  <h4 class="live-card-h">Google Search Console — Last {{ gscMetrics()!.rangeDays }} Days</h4>
+                  <div class="kpi-grid">
+                    <div class="kpi-box"><span class="kpi-num">{{ gscMetrics()!.clicks }}</span><span class="kpi-lbl">Clicks</span></div>
+                    <div class="kpi-box"><span class="kpi-num">{{ gscMetrics()!.impressions }}</span><span class="kpi-lbl">Impressions</span></div>
+                    <div class="kpi-box"><span class="kpi-num">{{ (gscMetrics()!.ctr * 100).toFixed(1) }}%</span><span class="kpi-lbl">CTR</span></div>
+                    <div class="kpi-box"><span class="kpi-num">{{ gscMetrics()!.avgPosition.toFixed(1) }}</span><span class="kpi-lbl">Avg Position</span></div>
+                  </div>
+                </div>
+              }
+
+              <!-- Google Ads Card -->
+              @if (adsMetrics()) {
+                <div class="live-card">
+                  <h4 class="live-card-h">Google Ads Campaigns — Account: {{ adsMetrics()!.accountId }}</h4>
+                  <div class="kpi-grid">
+                    <div class="kpi-box"><span class="kpi-num">$ {{ adsMetrics()!.totals.spend }}</span><span class="kpi-lbl">Total Spend</span></div>
+                    <div class="kpi-box"><span class="kpi-num">{{ adsMetrics()!.totals.impressions }}</span><span class="kpi-lbl">Impressions</span></div>
+                    <div class="kpi-box"><span class="kpi-num">{{ adsMetrics()!.totals.clicks }}</span><span class="kpi-lbl">Clicks</span></div>
+                    <div class="kpi-box"><span class="kpi-num">{{ adsMetrics()!.totals.conversions }}</span><span class="kpi-lbl">Conversions</span></div>
+                  </div>
+                  @if (adsMetrics()!.campaigns.length) {
+                    <div class="campaign-table">
+                      <div class="ct-head"><span>Campaign</span><span>Status</span><span>Spend</span><span>Clicks</span></div>
+                      @for (c of adsMetrics()!.campaigns; track c.id) {
+                        <div class="ct-row"><span>{{ c.name }}</span><span class="c-status">{{ c.status }}</span><span>$ {{ c.spend }}</span><span>{{ c.clicks }}</span></div>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            }
+          </div>
+
+        </section>
+      }
+
       <!-- ── Tab: Strategy Brief ── -->
       @if (activeTab() === 'brief') {
         <section class="tab-panel" aria-label="Marketing Strategy Brief">
@@ -418,6 +549,30 @@ const CAT_COLORS: Partial<Record<string, string>> = {
     .content-row-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
     .content-words { font-size: 12px; color: var(--color-text-muted); white-space: nowrap; }
     .content-status-badge { font-size: 10.5px; font-weight: 700; padding: 2px 9px; border-radius: 10px; background: #ECFDF5; color: #059669; letter-spacing: 0.04em; text-transform: uppercase; }
+
+    /* Integration Credentials & Live Section */
+    .creds-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 20px; display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; box-shadow: var(--shadow-card); }
+    .creds-title { font-size: 16px; font-weight: 700; color: var(--color-text); margin: 0 0 4px; }
+    .creds-sub { font-size: 12.5px; color: var(--color-text-muted); margin: 0; }
+    .field-link-wrap { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
+    .field-help-link { font-size: 11.5px; font-weight: 600; color: #6366F1; text-decoration: none; transition: color 0.15s; }
+    .field-help-link:hover { text-decoration: underline; color: #4F46E5; }
+    .ftab { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 12.5px; font-weight: 600; color: var(--color-text); background: var(--color-surface); cursor: pointer; }
+    .ftab:hover { border-color: #6366F1; color: #6366F1; }
+    .live-section { display: flex; flex-direction: column; gap: 16px; }
+    .live-header { display: flex; align-items: center; justify-content: space-between; }
+    .live-title { font-size: 16px; font-weight: 700; color: var(--color-text); margin: 0; }
+    .live-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+    .live-card-h { font-size: 14px; font-weight: 600; color: var(--color-text-secondary); margin: 0; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .kpi-box { background: var(--color-surface-raised); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .kpi-num { font-size: 18px; font-weight: 700; color: var(--color-text); }
+    .kpi-lbl { font-size: 11px; color: var(--color-text-muted); }
+    .campaign-table { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; border-top: 1px solid var(--color-border); padding-top: 10px; }
+    .ct-head, .ct-row { display: grid; grid-template-columns: 1fr 100px 100px 90px; gap: 10px; font-size: 12px; }
+    .ct-head { font-weight: 700; color: var(--color-text-muted); text-transform: uppercase; font-size: 10.5px; }
+    .ct-row { color: var(--color-text); }
+    .c-status { font-weight: 600; color: #10B981; }
   `]
 })
 export class MarketingTab implements OnInit {
@@ -429,14 +584,23 @@ export class MarketingTab implements OnInit {
 
   private projectId = '';
 
-  protected activeTab  = signal<'brief' | 'kanban' | 'assets' | 'content' | 'gate'>('brief');
+  protected activeTab  = signal<'analytics' | 'brief' | 'kanban' | 'assets' | 'content' | 'gate'>('analytics');
   protected saving     = signal(false);
   protected saveSuccess = signal(false);
+  protected savingCreds = signal(false);
+  protected credsSuccess = signal(false);
   protected gateLoading = signal(false);
   protected gateError   = signal('');
   protected gateWarnings = signal<string[]>([]);
   protected tasks        = signal<MarketingTask[]>([]);
   protected catFilter    = signal<CategoryFilter>('ALL');
+
+  // Live metrics signals
+  protected liveLoading  = signal(false);
+  protected liveError    = signal('');
+  protected ga4Metrics   = signal<any>(null);
+  protected gscMetrics   = signal<any>(null);
+  protected adsMetrics   = signal<any>(null);
 
   readonly COL_LABELS = COL_LABELS;
   readonly CAT_COLORS = CAT_COLORS;
@@ -444,11 +608,12 @@ export class MarketingTab implements OnInit {
   readonly categoryFilters: CategoryFilter[] = ['ALL', 'CONTENT', 'SOCIAL', 'PAID', 'SEO', 'ANALYTICS', 'OTHER'];
 
   readonly tabs = [
-    { id: 'brief'   as const, label: 'Strategy Brief' },
-    { id: 'kanban'  as const, label: 'Task Board' },
-    { id: 'assets'  as const, label: 'Design Assets' },
-    { id: 'content' as const, label: 'Content' },
-    { id: 'gate'    as const, label: 'Soft Gate' },
+    { id: 'analytics' as const, label: 'Google Analytics & Ads' },
+    { id: 'brief'     as const, label: 'Strategy Brief' },
+    { id: 'kanban'    as const, label: 'Task Board' },
+    { id: 'assets'    as const, label: 'Design Assets' },
+    { id: 'content'   as const, label: 'Content' },
+    { id: 'gate'      as const, label: 'Soft Gate' },
   ];
 
   protected briefForm = this.fb.group({
@@ -457,6 +622,15 @@ export class MarketingTab implements OnInit {
     budget:         [''],
     channels:       [''],
     notes:          [''],
+  });
+
+  protected googleForm = this.fb.group({
+    clientId:            [''],
+    clientSecret:        [''],
+    developerToken:      [''],
+    analyticsPropertyId: [''],
+    searchConsoleUrl:    [''],
+    googleAdsAccountId:  [''],
   });
 
   protected isCompleted   = computed(() => !!this.state.project()?.marketing?.completedAt);
@@ -489,6 +663,65 @@ export class MarketingTab implements OnInit {
       });
       this.tasks.set(mkt.tasks ?? []);
     }
+    this.loadProjectGoogleCredentials();
+  }
+
+  protected loadProjectGoogleCredentials() {
+    if (!this.projectId) return;
+    this.projectService.getProjectGoogleCredentials(this.projectId).subscribe({
+      next: (res) => {
+        this.googleForm.patchValue({
+          analyticsPropertyId: res.analyticsPropertyId ?? '',
+          searchConsoleUrl: res.searchConsoleUrl ?? '',
+          googleAdsAccountId: res.googleAdsAccountId ?? '',
+        });
+        if (res.analyticsPropertyId || res.searchConsoleUrl || res.googleAdsAccountId) {
+          this.loadLiveMetrics();
+        }
+      },
+    });
+  }
+
+  protected saveGoogleCredentials() {
+    if (this.savingCreds()) return;
+    this.savingCreds.set(true);
+    this.credsSuccess.set(false);
+    this.projectService.saveProjectGoogleCredentials(this.projectId, this.googleForm.value as any).subscribe({
+      next: () => {
+        this.savingCreds.set(false);
+        this.credsSuccess.set(true);
+        setTimeout(() => this.credsSuccess.set(false), 2500);
+        this.loadLiveMetrics();
+      },
+      error: () => this.savingCreds.set(false),
+    });
+  }
+
+  protected loadLiveMetrics() {
+    if (!this.projectId) return;
+    this.liveLoading.set(true);
+    this.liveError.set('');
+
+    this.projectService.getGa4Metrics(this.projectId, 30, true).subscribe({
+      next: (res) => this.ga4Metrics.set(res.data),
+      error: () => this.ga4Metrics.set(null),
+    });
+
+    this.projectService.getGscMetrics(this.projectId, 30, true).subscribe({
+      next: (res) => this.gscMetrics.set(res.data),
+      error: () => this.gscMetrics.set(null),
+    });
+
+    this.projectService.getGoogleAdsCampaigns(this.projectId, 30, true).subscribe({
+      next: (res) => {
+        this.adsMetrics.set(res.data);
+        this.liveLoading.set(false);
+      },
+      error: () => {
+        this.adsMetrics.set(null);
+        this.liveLoading.set(false);
+      },
+    });
   }
 
   protected saveBrief() {
