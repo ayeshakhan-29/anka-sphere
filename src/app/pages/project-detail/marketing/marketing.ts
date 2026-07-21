@@ -50,6 +50,13 @@ const CAT_COLORS: Partial<Record<string, string>> = {
                 <h3 class="creds-title">Project Google Integration & Credentials</h3>
                 <p class="creds-sub">Set project-specific Google Client ID, Secret, Ads Developer Token, and GA4 Property ID.</p>
               </div>
+              @if (credsStatus() === 'CONNECTED') {
+                <span class="conn-status-badge conn-status-badge--connected"><span class="status-dot status-dot--green"></span> Connected</span>
+              } @else if (credsStatus() === 'ERROR') {
+                <span class="conn-status-badge conn-status-badge--error"><span class="status-dot status-dot--red"></span> Error</span>
+              } @else {
+                <span class="conn-status-badge conn-status-badge--off"><span class="status-dot status-dot--gray"></span> Not Connected</span>
+              }
             </div>
 
             <form [formGroup]="googleForm" (ngSubmit)="saveGoogleCredentials()" class="brief-form">
@@ -101,8 +108,13 @@ const CAT_COLORS: Partial<Record<string, string>> = {
                 @if (credsSuccess()) {
                   <span class="save-ok" role="status">Credentials Saved & Connected!</span>
                 }
+                @if (credsStatus() === 'CONNECTED') {
+                  <button class="btn-sec-outline" type="button" (click)="resetGoogleCredentials()">
+                    Reset / Clear Credentials
+                  </button>
+                }
                 <button class="btn-primary" type="submit" [disabled]="savingCreds()">
-                  {{ savingCreds() ? 'Saving…' : 'Save & Connect Credentials' }}
+                  {{ savingCreds() ? 'Saving…' : (credsStatus() === 'CONNECTED' ? 'Update Credentials' : 'Save & Connect Credentials') }}
                 </button>
               </div>
             </form>
@@ -129,6 +141,14 @@ const CAT_COLORS: Partial<Record<string, string>> = {
                     <div class="kpi-box"><span class="kpi-num">{{ (ga4Metrics()!.engagementRate * 100).toFixed(1) }}%</span><span class="kpi-lbl">Engagement Rate</span></div>
                   </div>
                 </div>
+              } @else if (ga4Error()) {
+                <div class="metric-warning-box">
+                  <div class="mwb-header">
+                    <span class="mwb-title">Google Analytics 4</span>
+                    <span class="mwb-badge">Configuration Required</span>
+                  </div>
+                  <p class="mwb-msg">{{ ga4Error() }}</p>
+                </div>
               }
 
               <!-- Search Console Card -->
@@ -141,6 +161,14 @@ const CAT_COLORS: Partial<Record<string, string>> = {
                     <div class="kpi-box"><span class="kpi-num">{{ (gscMetrics()!.ctr * 100).toFixed(1) }}%</span><span class="kpi-lbl">CTR</span></div>
                     <div class="kpi-box"><span class="kpi-num">{{ gscMetrics()!.avgPosition.toFixed(1) }}</span><span class="kpi-lbl">Avg Position</span></div>
                   </div>
+                </div>
+              } @else if (gscError()) {
+                <div class="metric-warning-box">
+                  <div class="mwb-header">
+                    <span class="mwb-title">Google Search Console</span>
+                    <span class="mwb-badge">Configuration Required</span>
+                  </div>
+                  <p class="mwb-msg">{{ gscError() }}</p>
                 </div>
               }
 
@@ -162,6 +190,14 @@ const CAT_COLORS: Partial<Record<string, string>> = {
                       }
                     </div>
                   }
+                </div>
+              } @else if (adsError()) {
+                <div class="metric-warning-box">
+                  <div class="mwb-header">
+                    <span class="mwb-title">Google Ads Campaigns</span>
+                    <span class="mwb-badge">Configuration Required</span>
+                  </div>
+                  <p class="mwb-msg">{{ adsError() }}</p>
                 </div>
               }
             }
@@ -454,6 +490,12 @@ const CAT_COLORS: Partial<Record<string, string>> = {
     }
     .btn-primary:hover:not(:disabled) { background: #EA6C0A; }
     .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-sec-outline {
+      height: 36px; padding: 0 14px; background: transparent; color: var(--color-text-secondary);
+      border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); font-family: var(--font-sans);
+      font-size: 12.5px; font-weight: 600; cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .btn-sec-outline:hover { background: rgba(239, 68, 68, 0.08); color: #EF4444; border-color: #FCA5A5; }
 
     /* Category filter */
     .cat-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
@@ -552,8 +594,17 @@ const CAT_COLORS: Partial<Record<string, string>> = {
 
     /* Integration Credentials & Live Section */
     .creds-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 20px; display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; box-shadow: var(--shadow-card); }
+    .creds-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .creds-title { font-size: 16px; font-weight: 700; color: var(--color-text); margin: 0 0 4px; }
     .creds-sub { font-size: 12.5px; color: var(--color-text-muted); margin: 0; }
+    .conn-status-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 14px; border: 1px solid transparent; }
+    .conn-status-badge--connected { background: #ECFDF5; color: #059669; border-color: #A7F3D0; }
+    .conn-status-badge--off { background: var(--color-surface-raised); color: var(--color-text-muted); border-color: var(--color-border); }
+    .conn-status-badge--error { background: #FEE2E2; color: #DC2626; border-color: #FECACA; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .status-dot--green { background: #10B981; box-shadow: 0 0 8px rgba(16, 185, 129, 0.6); }
+    .status-dot--gray { background: #94A3B8; }
+    .status-dot--red { background: #EF4444; }
     .field-link-wrap { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
     .field-help-link { font-size: 11.5px; font-weight: 600; color: #6366F1; text-decoration: none; transition: color 0.15s; }
     .field-help-link:hover { text-decoration: underline; color: #4F46E5; }
@@ -573,6 +624,13 @@ const CAT_COLORS: Partial<Record<string, string>> = {
     .ct-head { font-weight: 700; color: var(--color-text-muted); text-transform: uppercase; font-size: 10.5px; }
     .ct-row { color: var(--color-text); }
     .c-status { font-weight: 600; color: #10B981; }
+
+    /* Metric Warning Box */
+    .metric-warning-box { background: rgba(239, 68, 68, 0.05); border: 1px dashed rgba(239, 68, 68, 0.35); border-radius: var(--radius-lg); padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+    .mwb-header { display: flex; align-items: center; justify-content: space-between; }
+    .mwb-title { font-size: 14px; font-weight: 700; color: var(--color-text); }
+    .mwb-badge { font-size: 10.5px; font-weight: 700; color: #EF4444; background: #FEE2E2; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .mwb-msg { font-size: 13px; color: var(--color-text-secondary); margin: 0; line-height: 1.5; }
   `]
 })
 export class MarketingTab implements OnInit {
@@ -601,6 +659,9 @@ export class MarketingTab implements OnInit {
   protected ga4Metrics   = signal<any>(null);
   protected gscMetrics   = signal<any>(null);
   protected adsMetrics   = signal<any>(null);
+  protected ga4Error     = signal<string>('');
+  protected gscError     = signal<string>('');
+  protected adsError     = signal<string>('');
 
   readonly COL_LABELS = COL_LABELS;
   readonly CAT_COLORS = CAT_COLORS;
@@ -664,20 +725,22 @@ export class MarketingTab implements OnInit {
       this.tasks.set(mkt.tasks ?? []);
     }
     this.loadProjectGoogleCredentials();
+    this.loadLiveMetrics();
   }
+
+  protected credsStatus = signal<string>('NOT_CONFIGURED');
 
   protected loadProjectGoogleCredentials() {
     if (!this.projectId) return;
     this.projectService.getProjectGoogleCredentials(this.projectId).subscribe({
       next: (res) => {
+        this.credsStatus.set(res.status ?? (res.hasClientId ? 'CONNECTED' : 'NOT_CONFIGURED'));
         this.googleForm.patchValue({
+          clientId: res.maskedClientId ?? '',
           analyticsPropertyId: res.analyticsPropertyId ?? '',
           searchConsoleUrl: res.searchConsoleUrl ?? '',
           googleAdsAccountId: res.googleAdsAccountId ?? '',
         });
-        if (res.analyticsPropertyId || res.searchConsoleUrl || res.googleAdsAccountId) {
-          this.loadLiveMetrics();
-        }
       },
     });
   }
@@ -690,7 +753,32 @@ export class MarketingTab implements OnInit {
       next: () => {
         this.savingCreds.set(false);
         this.credsSuccess.set(true);
+        this.credsStatus.set('CONNECTED');
         setTimeout(() => this.credsSuccess.set(false), 2500);
+        this.loadLiveMetrics();
+      },
+      error: () => {
+        this.savingCreds.set(false);
+        this.credsStatus.set('ERROR');
+      },
+    });
+  }
+
+  protected resetGoogleCredentials() {
+    if (!confirm('Are you sure you want to clear saved credentials for this project?')) return;
+    this.googleForm.reset();
+    this.savingCreds.set(true);
+    this.projectService.saveProjectGoogleCredentials(this.projectId, {
+      clientId: '',
+      clientSecret: '',
+      developerToken: '',
+      analyticsPropertyId: '',
+      searchConsoleUrl: '',
+      googleAdsAccountId: '',
+    }).subscribe({
+      next: () => {
+        this.savingCreds.set(false);
+        this.credsStatus.set('NOT_CONFIGURED');
         this.loadLiveMetrics();
       },
       error: () => this.savingCreds.set(false),
@@ -701,24 +789,41 @@ export class MarketingTab implements OnInit {
     if (!this.projectId) return;
     this.liveLoading.set(true);
     this.liveError.set('');
+    this.ga4Error.set('');
+    this.gscError.set('');
+    this.adsError.set('');
 
     this.projectService.getGa4Metrics(this.projectId, 30, true).subscribe({
-      next: (res) => this.ga4Metrics.set(res.data),
-      error: () => this.ga4Metrics.set(null),
+      next: (res) => {
+        this.ga4Metrics.set(res.data);
+        this.ga4Error.set('');
+      },
+      error: (err) => {
+        this.ga4Metrics.set(null);
+        this.ga4Error.set(err.error?.message || 'GA4 Property ID is not configured or failed to connect to Google Analytics.');
+      },
     });
 
     this.projectService.getGscMetrics(this.projectId, 30, true).subscribe({
-      next: (res) => this.gscMetrics.set(res.data),
-      error: () => this.gscMetrics.set(null),
+      next: (res) => {
+        this.gscMetrics.set(res.data);
+        this.gscError.set('');
+      },
+      error: (err) => {
+        this.gscMetrics.set(null);
+        this.gscError.set(err.error?.message || 'Search Console Property URL is not configured or failed to connect.');
+      },
     });
 
     this.projectService.getGoogleAdsCampaigns(this.projectId, 30, true).subscribe({
       next: (res) => {
         this.adsMetrics.set(res.data);
+        this.adsError.set('');
         this.liveLoading.set(false);
       },
-      error: () => {
+      error: (err) => {
         this.adsMetrics.set(null);
+        this.adsError.set(err.error?.message || 'Google Ads Customer Account ID or Developer Token is not configured.');
         this.liveLoading.set(false);
       },
     });
