@@ -36,6 +36,13 @@ import {
   AdNetwork,
   SocialPost,
   SocialPostInput,
+  EmailCampaign,
+  ContentRepurpose,
+  CommunityQueueItem,
+  AdCreative,
+  ConversionEvent,
+  Backlink,
+  KeywordRankLog,
 } from '../models/project.models';
 
 @Injectable({ providedIn: 'root' })
@@ -521,4 +528,113 @@ export class ProjectService {
   }) {
     return this.api.post<{ success: boolean; status: string }>(`/projects/${projectId}/google-credentials`, data);
   }
+
+  // ── Email Campaigns ───────────────────────────────────────────────────────
+
+  getEmailCampaigns(projectId: string) {
+    return this.api.get<EmailCampaign[]>(`/projects/${projectId}/email-campaigns`);
+  }
+
+  createEmailCampaign(projectId: string, data: Partial<EmailCampaign>) {
+    return this.api.post<EmailCampaign>(`/projects/${projectId}/email-campaigns`, data);
+  }
+
+  deleteEmailCampaign(projectId: string, campaignId: string) {
+    return this.api.delete<void>(`/projects/${projectId}/email-campaigns/${campaignId}`);
+  }
+
+  // ── Content Repurposing ───────────────────────────────────────────────────
+
+  getContentRepurposes(projectId: string) {
+    return this.api.get<ContentRepurpose[]>(`/projects/${projectId}/repurposing`);
+  }
+
+  createContentRepurpose(projectId: string, data: Partial<ContentRepurpose>) {
+    return this.api.post<ContentRepurpose>(`/projects/${projectId}/repurposing`, data);
+  }
+
+  deleteContentRepurpose(projectId: string, itemId: string) {
+    return this.api.delete<void>(`/projects/${projectId}/repurposing/${itemId}`);
+  }
+
+  // ── Master Content Calendar ───────────────────────────────────────────────
+
+  getMasterCalendar(projectId: string) {
+    return this.api.get<any[]>(`/projects/${projectId}/master-calendar`);
+  }
+
+  // ── Community Queue ───────────────────────────────────────────────────────
+
+  getCommunityQueue(projectId: string) {
+    return this.api.get<CommunityQueueItem[]>(`/projects/${projectId}/social/community-queue`);
+  }
+
+  createCommunityQueueItem(projectId: string, data: Partial<CommunityQueueItem>) {
+    return this.api.post<CommunityQueueItem>(`/projects/${projectId}/social/community-queue`, data);
+  }
+
+  updateCommunityQueueItem(projectId: string, itemId: string, data: Partial<CommunityQueueItem>) {
+    return this.api.patch<CommunityQueueItem>(`/projects/${projectId}/social/community-queue/${itemId}`, data);
+  }
+
+  deleteCommunityQueueItem(projectId: string, itemId: string) {
+    return this.api.delete<void>(`/projects/${projectId}/social/community-queue/${itemId}`);
+  }
+
+  // ── Ad Creatives ──────────────────────────────────────────────────────────
+
+  getAdCreatives(projectId: string) {
+    return this.api.get<AdCreative[]>(`/projects/${projectId}/paid/ad-creatives`);
+  }
+
+  createAdCreative(projectId: string, data: Partial<AdCreative>) {
+    return this.api.post<AdCreative>(`/projects/${projectId}/paid/ad-creatives`, data);
+  }
+
+  deleteAdCreative(projectId: string, creativeId: string) {
+    return this.api.delete<void>(`/projects/${projectId}/paid/ad-creatives/${creativeId}`);
+  }
+
+  // ── Conversion Events ─────────────────────────────────────────────────────
+
+  getConversionEvents(projectId: string) {
+    return this.api.get<ConversionEvent[]>(`/projects/${projectId}/paid/conversion-events`);
+  }
+
+  createConversionEvent(projectId: string, data: Partial<ConversionEvent>) {
+    return this.api.post<ConversionEvent>(`/projects/${projectId}/paid/conversion-events`, data);
+  }
+
+  updateConversionEvent(projectId: string, eventId: string, data: Partial<ConversionEvent>) {
+    return this.api.patch<ConversionEvent>(`/projects/${projectId}/paid/conversion-events/${eventId}`, data);
+  }
+
+  deleteConversionEvent(projectId: string, eventId: string) {
+    return this.api.delete<void>(`/projects/${projectId}/paid/conversion-events/${eventId}`);
+  }
+
+  // ── Backlinks ──────────────────────────────────────────────────────────────
+
+  getBacklinks(projectId: string) {
+    return this.api.get<Backlink[]>(`/projects/${projectId}/seo/backlinks`);
+  }
+
+  createBacklink(projectId: string, data: Partial<Backlink>) {
+    return this.api.post<Backlink>(`/projects/${projectId}/seo/backlinks`, data);
+  }
+
+  deleteBacklink(projectId: string, linkId: string) {
+    return this.api.delete<void>(`/projects/${projectId}/seo/backlinks/${linkId}`);
+  }
+
+  // ── Rank Tracker ──────────────────────────────────────────────────────────
+
+  getKeywordRankLogs(projectId: string) {
+    return this.api.get<KeywordRankLog[]>(`/projects/${projectId}/seo/rank-tracker`);
+  }
+
+  createKeywordRankLog(projectId: string, data: Partial<KeywordRankLog>) {
+    return this.api.post<KeywordRankLog>(`/projects/${projectId}/seo/rank-tracker`, data);
+  }
 }
+

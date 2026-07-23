@@ -6,7 +6,7 @@ import { ProjectService } from '../../services/project.service';
 import { IntegrationService } from '../../services/integration.service';
 import { Project, GscMetrics } from '../../models/project.models';
 
-type TabId = 'projects' | 'keywords' | 'onpage' | 'tasks';
+type TabId = 'projects' | 'keywords' | 'onpage' | 'backlinks' | 'rank_tracker' | 'tasks';
 
 interface SeoProject {
   id: string;
@@ -357,6 +357,88 @@ function splitKw(raw?: string): string[] {
           </div>
         }
 
+        <!-- ── Tab: Backlink Tracker ── -->
+        @if (activeTab() === 'backlinks') {
+          <section aria-label="Backlink Tracker" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <h3 style="font-size: 15px; font-weight: 600; color: var(--color-text); margin: 0;">Backlink Tracker</h3>
+                <p style="font-size: 12px; color: var(--color-text-muted); margin: 2px 0 0;">Log & track acquired backlinks, anchor text, domain authority (DA/DR), and link status.</p>
+              </div>
+              <ui-badge variant="success">3 Live Backlinks</ui-badge>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 180px 140px 1fr 90px 100px; gap: 10px; padding: 0 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--color-text-muted);">
+              <span>Source Domain</span><span>Target Page</span><span>Anchor Text</span><span>DA Score</span><span>Status</span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <div style="display: grid; grid-template-columns: 180px 140px 1fr 90px 100px; gap: 10px; align-items: center; padding: 10px 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px;">
+                <span style="font-size: 13px; font-weight: 600; color: #10B981;">techcrunch.com</span>
+                <span style="font-size: 12px; color: var(--color-text-muted); font-family: monospace;">/services</span>
+                <span style="font-size: 12.5px;">"top digital growth platform"</span>
+                <span style="font-size: 13px; font-weight: 700;">88</span>
+                <ui-badge variant="success">Live</ui-badge>
+              </div>
+              <div style="display: grid; grid-template-columns: 180px 140px 1fr 90px 100px; gap: 10px; align-items: center; padding: 10px 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px;">
+                <span style="font-size: 13px; font-weight: 600; color: #10B981;">searchengineland.com</span>
+                <span style="font-size: 12px; color: var(--color-text-muted); font-family: monospace;">/blog/seo-guide</span>
+                <span style="font-size: 12.5px;">"SEO best practices"</span>
+                <span style="font-size: 13px; font-weight: 700;">76</span>
+                <ui-badge variant="success">Live</ui-badge>
+              </div>
+              <div style="display: grid; grid-template-columns: 180px 140px 1fr 90px 100px; gap: 10px; align-items: center; padding: 10px 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px;">
+                <span style="font-size: 13px; font-weight: 600; color: var(--color-text);">medium.com</span>
+                <span style="font-size: 12px; color: var(--color-text-muted); font-family: monospace;">/about</span>
+                <span style="font-size: 12.5px;">"marketing agency"</span>
+                <span style="font-size: 13px; font-weight: 700;">64</span>
+                <ui-badge variant="warning">Pending</ui-badge>
+              </div>
+            </div>
+          </section>
+        }
+
+        <!-- ── Tab: Rank Tracker ── -->
+        @if (activeTab() === 'rank_tracker') {
+          <section aria-label="Keyword Rank Tracker" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <h3 style="font-size: 15px; font-weight: 600; color: var(--color-text); margin: 0;">Keyword Rank Tracker</h3>
+                <p style="font-size: 12px; color: var(--color-text-muted); margin: 2px 0 0;">Track weekly keyword ranking positions, movement (up/down), and cluster breakdown.</p>
+              </div>
+              <ui-badge variant="success">Avg Position #4.2</ui-badge>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 160px 100px 100px 110px; gap: 10px; padding: 0 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--color-text-muted);">
+              <span>Keyword</span><span>Topic Cluster</span><span>Position</span><span>Previous</span><span>Movement</span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <div style="display: grid; grid-template-columns: 1fr 160px 100px 100px 110px; gap: 10px; align-items: center; padding: 10px 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px;">
+                <span style="font-size: 13px; font-weight: 600;">"digital marketing dashboard"</span>
+                <span style="font-size: 12px; color: var(--color-text-muted);">Core Services</span>
+                <span style="font-size: 14px; font-weight: 700; color: #10B981;">#2</span>
+                <span style="font-size: 13px; color: var(--color-text-muted);">#5</span>
+                <span style="font-size: 12px; font-weight: 700; color: #059669;">▲ +3 Pos</span>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 160px 100px 100px 110px; gap: 10px; align-items: center; padding: 10px 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px;">
+                <span style="font-size: 13px; font-weight: 600;">"growth agency operations"</span>
+                <span style="font-size: 12px; color: var(--color-text-muted);">Agency Growth</span>
+                <span style="font-size: 14px; font-weight: 700; color: #10B981;">#4</span>
+                <span style="font-size: 13px; color: var(--color-text-muted);">#4</span>
+                <span style="font-size: 12px; font-weight: 600; color: var(--color-text-muted);">= No Change</span>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 160px 100px 100px 110px; gap: 10px; align-items: center; padding: 10px 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px;">
+                <span style="font-size: 13px; font-weight: 600;">"full funnel marketing platform"</span>
+                <span style="font-size: 12px; color: var(--color-text-muted);">Full Funnel</span>
+                <span style="font-size: 14px; font-weight: 700; color: #10B981;">#6</span>
+                <span style="font-size: 13px; color: var(--color-text-muted);">#8</span>
+                <span style="font-size: 12px; font-weight: 700; color: #059669;">▲ +2 Pos</span>
+              </div>
+            </div>
+          </section>
+        }
+
         <!-- ── Tab: SEO Tasks ── -->
         @if (activeTab() === 'tasks') {
           <div class="tasks-section">
@@ -543,10 +625,12 @@ export class SeoDept implements OnInit {
   protected allTasks    = signal<SeoTask[]>([]);
 
   readonly tabs = [
-    { id: 'projects'  as TabId, label: 'Projects',        count: computed(() => this.projects().length) },
-    { id: 'keywords'  as TabId, label: 'Keyword Board',   count: computed(() => this.allKeywords().length) },
-    { id: 'onpage'    as TabId, label: 'On-Page SEO',     count: computed(() => this.allPages().length) },
-    { id: 'tasks'     as TabId, label: 'SEO Tasks',       count: computed(() => this.allTasks().length) },
+    { id: 'projects'     as TabId, label: 'Projects',        count: computed(() => this.projects().length) },
+    { id: 'keywords'     as TabId, label: 'Keyword Board',   count: computed(() => this.allKeywords().length) },
+    { id: 'onpage'       as TabId, label: 'On-Page SEO',     count: computed(() => this.allPages().length) },
+    { id: 'backlinks'    as TabId, label: 'Backlinks',       count: computed(() => 3) },
+    { id: 'rank_tracker' as TabId, label: 'Rank Tracker',    count: computed(() => 4) },
+    { id: 'tasks'        as TabId, label: 'SEO Tasks',       count: computed(() => this.allTasks().length) },
   ];
 
   readonly kwFilters = [

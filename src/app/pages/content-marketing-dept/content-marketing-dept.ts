@@ -4,7 +4,7 @@ import { Badge } from '../../ui';
 import { ProjectService } from '../../services/project.service';
 import { Project } from '../../models/project.models';
 
-type TabId = 'projects' | 'pipeline' | 'tasks';
+type TabId = 'projects' | 'pipeline' | 'tasks' | 'calendar' | 'emails' | 'repurposing';
 
 interface CMProject {
   id: string; name: string; client: string; clientInitials: string;
@@ -147,6 +147,90 @@ interface CMTask {
           </div>
         }
 
+        <!-- Master Content Calendar tab -->
+        @if (activeTab() === 'calendar') {
+          <div class="master-cal-wrap">
+            <div class="cal-header">
+              <h3 class="cal-title">Master Content Calendar</h3>
+              <p class="cal-sub">Unified multi-channel calendar across Blogs, Social Posts, and Email Newsletters.</p>
+            </div>
+            <div class="calendar-grid">
+              <div class="cal-card">
+                <span class="cal-type-badge blog">BLOG</span>
+                <h4 class="cal-item-title">Product Feature Update Announcement</h4>
+                <p class="cal-item-meta">Website Blog · Scheduled for Next Monday</p>
+                <ui-badge variant="info">In Review</ui-badge>
+              </div>
+              <div class="cal-card">
+                <span class="cal-type-badge social">SOCIAL</span>
+                <h4 class="cal-item-title">Top 5 Industry Best Practices (Carousel)</h4>
+                <p class="cal-item-meta">LinkedIn & Instagram · Scheduled for Wednesday</p>
+                <ui-badge variant="success">Approved</ui-badge>
+              </div>
+              <div class="cal-card">
+                <span class="cal-type-badge email">EMAIL</span>
+                <h4 class="cal-item-title">Monthly Agency Newsletter Issue #14</h4>
+                <p class="cal-item-meta">All Active Subscribers · Scheduled for 1st of Month</p>
+                <ui-badge variant="default">Draft</ui-badge>
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- Email Campaigns tab -->
+        @if (activeTab() === 'emails') {
+          <div class="emails-wrap">
+            <div class="cal-header">
+              <h3 class="cal-title">Email Marketing Workflows</h3>
+              <p class="cal-sub">Draft and manage email newsletters, campaign briefs, and subscriber segment copy.</p>
+            </div>
+            <div class="pipe-header" aria-hidden="true">
+              <span>Campaign Name</span><span>Audience Segment</span><span>CTA</span><span>Status</span>
+            </div>
+            <div class="pipe-list">
+              <div class="pipe-row">
+                <div><strong>Q3 Product Newsletter</strong><br/><small style="color: var(--color-text-muted)">Subject: What's New in Q3?</small></div>
+                <span>VIP Clients & Leads</span>
+                <span>Read Overview</span>
+                <ui-badge variant="success">Scheduled</ui-badge>
+              </div>
+              <div class="pipe-row">
+                <div><strong>Onboarding Nurture Series #1</strong><br/><small style="color: var(--color-text-muted)">Subject: Welcome to Anka Sphere</small></div>
+                <span>New Signups</span>
+                <span>Get Started</span>
+                <ui-badge variant="info">Active</ui-badge>
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- Repurposing Tracker tab -->
+        @if (activeTab() === 'repurposing') {
+          <div class="repurpose-wrap">
+            <div class="cal-header">
+              <h3 class="cal-title">Content Repurposing Tracker</h3>
+              <p class="cal-sub">Track how core articles are transformed into social carousels, LinkedIn posts, and email snippets.</p>
+            </div>
+            <div class="pipe-header" aria-hidden="true">
+              <span>Source Article</span><span>Target Format</span><span>Repurposed Output</span><span>Status</span>
+            </div>
+            <div class="pipe-list">
+              <div class="pipe-row">
+                <div><strong>10 Strategies for Organic Growth</strong><br/><small style="color: var(--color-text-muted)">Original Blog Post</small></div>
+                <span>Instagram Carousel</span>
+                <span>10 Slides Key Takeaways</span>
+                <ui-badge variant="success">Completed</ui-badge>
+              </div>
+              <div class="pipe-row">
+                <div><strong>10 Strategies for Organic Growth</strong><br/><small style="color: var(--color-text-muted)">Original Blog Post</small></div>
+                <span>LinkedIn Article</span>
+                <span>Executive Summary Post</span>
+                <ui-badge variant="info">In Progress</ui-badge>
+              </div>
+            </div>
+          </div>
+        }
+
         <!-- Tasks tab -->
         @if (activeTab() === 'tasks') {
           <div class="filter-row" role="group" aria-label="Filter by task status">
@@ -198,21 +282,20 @@ interface CMTask {
     .kpi-val { font-size: 20px; font-weight: 700; color: var(--color-text); line-height: 1; }
     .kpi-lbl { font-size: 11.5px; color: var(--color-text-muted); margin-top: 2px; }
 
-    .tab-nav { display: flex; gap: 2px; border-bottom: 1px solid var(--color-border); }
-    .tab-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border: none; background: transparent; font-family: var(--font-sans); font-size: 13px; font-weight: 500; color: var(--color-text-secondary); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.15s, border-color 0.15s; white-space: nowrap; }
-    .tab-btn:hover { color: var(--color-text); }
-    .tab-btn.active { color: #F59E0B; border-bottom-color: #F59E0B; }
-    .tab-count { background: #FEF3C7; color: #D97706; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px; }
+    .tab-nav { display: flex; gap: 6px; border-bottom: 1px solid var(--color-border); padding-bottom: 8px; }
+    .tab-btn { height: 32px; padding: 0 14px; background: transparent; border: 1px solid transparent; border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 13px; font-weight: 500; color: var(--color-text-secondary); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.12s; }
+    .tab-btn:hover { background: var(--color-surface-raised); color: var(--color-text); }
+    .tab-btn.active { background: var(--color-surface); border-color: var(--color-border-strong); color: var(--color-text); font-weight: 600; box-shadow: var(--shadow-card); }
+    .tab-count { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 10px; background: var(--color-surface-raised); color: var(--color-text-muted); }
 
-    .loading-state { display: flex; align-items: center; gap: 10px; padding: 40px; justify-content: center; color: var(--color-text-muted); font-size: 13.5px; }
-    .spinner { width: 18px; height: 18px; border: 2px solid var(--color-border); border-top-color: #F59E0B; border-radius: 50%; animation: spin 0.7s linear infinite; }
+    .loading-state { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 48px; color: var(--color-text-muted); font-size: 14px; }
+    .spinner { width: 18px; height: 18px; border: 2px solid var(--color-border); border-top-color: #F59E0B; border-radius: 50%; animation: spin 0.6s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .filter-row { display: flex; gap: 4px; flex-wrap: wrap; }
-    .ftab { display: flex; align-items: center; gap: 5px; height: 30px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: 15px; font-family: var(--font-sans); font-size: 12px; font-weight: 500; color: var(--color-text-secondary); background: var(--color-surface); cursor: pointer; transition: all 0.15s; }
-    .ftab:hover { border-color: #F59E0B; color: #D97706; }
-    .ftab.active { background: #F59E0B; color: #fff; border-color: #F59E0B; }
-    .ftab-count { font-size: 10.5px; font-weight: 700; }
+    .filter-row { display: flex; gap: 6px; margin-bottom: 8px; }
+    .ftab { height: 26px; padding: 0 10px; background: transparent; border: 1px solid var(--color-border); border-radius: 13px; font-family: var(--font-sans); font-size: 12px; color: var(--color-text-muted); cursor: pointer; display: flex; align-items: center; gap: 5px; }
+    .ftab.active { background: var(--color-text); color: var(--color-surface); border-color: var(--color-text); font-weight: 600; }
+    .ftab-count { font-size: 10.5px; opacity: 0.8; }
 
     .list-header { display: grid; grid-template-columns: 1fr 140px 140px 100px 80px; gap: 10px; padding: 0 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-muted); }
     .proj-list { display: flex; flex-direction: column; gap: 6px; }
@@ -256,6 +339,19 @@ interface CMTask {
     .task-status[data-s="DONE"] { background: #ECFDF5; color: #059669; }
     .task-status[data-s="IN_PROGRESS"] { background: #EFF6FF; color: #2563EB; }
     .task-status[data-s="IN_REVIEW"] { background: #FEF3C7; color: #D97706; }
+
+    .master-cal-wrap, .emails-wrap, .repurpose-wrap { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .cal-header { display: flex; flex-direction: column; gap: 2px; }
+    .cal-title { font-size: 15px; font-weight: 600; color: var(--color-text); margin: 0; }
+    .cal-sub { font-size: 12px; color: var(--color-text-muted); margin: 0; }
+    .calendar-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 6px; }
+    .cal-card { padding: 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 6px; }
+    .cal-type-badge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; width: fit-content; }
+    .cal-type-badge.blog { background: #E0E7FF; color: #4338CA; }
+    .cal-type-badge.social { background: #FCE7F3; color: #BE185D; }
+    .cal-type-badge.email { background: #FEF3C7; color: #B45309; }
+    .cal-item-title { font-size: 13px; font-weight: 600; color: var(--color-text); margin: 0; }
+    .cal-item-meta { font-size: 11.5px; color: var(--color-text-muted); margin: 0; }
   `]
 })
 export class ContentMarketingDept implements OnInit {
@@ -272,6 +368,9 @@ export class ContentMarketingDept implements OnInit {
   readonly tabs = [
     { id: 'projects'  as TabId, label: 'Projects',          count: computed(() => this.projects().length) },
     { id: 'pipeline'  as TabId, label: 'Content Pipeline',  count: computed(() => this.allPages().length) },
+    { id: 'calendar'  as TabId, label: 'Master Calendar',   count: computed(() => 3) },
+    { id: 'emails'    as TabId, label: 'Email Workflows',   count: computed(() => 2) },
+    { id: 'repurposing' as TabId, label: 'Repurposing',      count: computed(() => 2) },
     { id: 'tasks'     as TabId, label: 'Tasks',             count: computed(() => this.allTasks().length) },
   ];
 

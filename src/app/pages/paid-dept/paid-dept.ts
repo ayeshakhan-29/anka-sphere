@@ -6,7 +6,7 @@ import { ProjectService } from '../../services/project.service';
 import { IntegrationService } from '../../services/integration.service';
 import { Project, AdAccountSummary, AdAccountLink, AdNetwork } from '../../models/project.models';
 
-type TabId = 'projects' | 'live' | 'budget' | 'adcopy' | 'tasks';
+type TabId = 'projects' | 'live' | 'budget' | 'adcopy' | 'creatives' | 'conversions' | 'tasks';
 
 interface PaidProject {
   id: string; name: string; client: string; clientInitials: string;
@@ -62,6 +62,7 @@ interface PaidTask {
           </button>
         }
       </div>
+
 
       @if (loading()) {
         <div class="loading-state" role="status"><div class="spinner" aria-hidden="true"></div>Loading…</div>
@@ -278,6 +279,90 @@ interface PaidTask {
           </section>
         }
 
+        <!-- ── Ad Creatives tab ── -->
+        @if (activeTab() === 'creatives') {
+          <section aria-label="Ad Creative Library" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <h3 style="font-size: 15px; font-weight: 600; color: var(--color-text); margin: 0;">Ad Creative Library</h3>
+                <p style="font-size: 12px; color: var(--color-text-muted); margin: 2px 0 0;">Static images, video ads, carousel assets, and headline/copy combinations.</p>
+              </div>
+              <ui-badge variant="info">3 Active Creatives</ui-badge>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+              <div style="padding: 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px; display: flex; flex-direction: column; gap: 6px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 10px; font-weight: 700; background: #DBEAFE; color: #1E40AF; padding: 2px 6px; border-radius: 4px;">META ADS</span>
+                  <ui-badge variant="success">Active</ui-badge>
+                </div>
+                <h4 style="font-size: 13.5px; font-weight: 600; margin: 0;">Summer Promo Banner V1</h4>
+                <p style="font-size: 11.5px; color: var(--color-text-muted); margin: 0;">Format: Single Image (1080x1080)</p>
+                <p style="font-size: 12px; color: var(--color-text); margin: 4px 0 0;">"Unlock 25% Off Summer Deals Today!"</p>
+              </div>
+              <div style="padding: 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px; display: flex; flex-direction: column; gap: 6px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 10px; font-weight: 700; background: #FEE2E2; color: #991B1B; padding: 2px 6px; border-radius: 4px;">GOOGLE ADS</span>
+                  <ui-badge variant="success">Active</ui-badge>
+                </div>
+                <h4 style="font-size: 13.5px; font-weight: 600; margin: 0;">Search Ad Copy Combo #3</h4>
+                <p style="font-size: 11.5px; color: var(--color-text-muted); margin: 0;">Format: Responsive Search Ad</p>
+                <p style="font-size: 12px; color: var(--color-text); margin: 4px 0 0;">"Best Agency Services | Book a Consultation"</p>
+              </div>
+              <div style="padding: 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px; display: flex; flex-direction: column; gap: 6px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 10px; font-weight: 700; background: #FCE7F3; color: #9D174D; padding: 2px 6px; border-radius: 4px;">TIKTOK ADS</span>
+                  <ui-badge variant="info">In Review</ui-badge>
+                </div>
+                <h4 style="font-size: 13.5px; font-weight: 600; margin: 0;">15s Hook Video Clip</h4>
+                <p style="font-size: 11.5px; color: var(--color-text-muted); margin: 0;">Format: Vertical Video (9:16)</p>
+                <p style="font-size: 12px; color: var(--color-text); margin: 4px 0 0;">"Stop doing marketing the old way..."</p>
+              </div>
+            </div>
+          </section>
+        }
+
+        <!-- ── Conversion Tracking Log tab ── -->
+        @if (activeTab() === 'conversions') {
+          <section aria-label="Conversion Tracking Log" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <h3 style="font-size: 15px; font-weight: 600; color: var(--color-text); margin: 0;">Conversion Tracking Log</h3>
+                <p style="font-size: 12px; color: var(--color-text-muted); margin: 2px 0 0;">Audit GTM tags, Meta Pixel events, Google Ads conversion actions, and TikTok Pixel firing status.</p>
+              </div>
+              <ui-badge variant="success">All Systems Operational</ui-badge>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 180px 120px 1fr 100px 110px; gap: 10px; padding: 0 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--color-text-muted);">
+              <span>Event Name</span><span>Platform</span><span>Trigger URL / Element</span><span>Firing Rate</span><span>Status</span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <div style="display: grid; grid-template-columns: 180px 120px 1fr 100px 110px; gap: 10px; align-items: center; padding: 10px 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px;">
+                <span style="font-size: 13px; font-weight: 600;">Lead Form Submit</span>
+                <span style="font-size: 12px; font-weight: 500;">Google GTM</span>
+                <span style="font-size: 12px; color: var(--color-text-muted); font-family: monospace;">/thank-you</span>
+                <span style="font-size: 12.5px; font-weight: 600; color: #059669;">100%</span>
+                <ui-badge variant="success">Firing</ui-badge>
+              </div>
+              <div style="display: grid; grid-template-columns: 180px 120px 1fr 100px 110px; gap: 10px; align-items: center; padding: 10px 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px;">
+                <span style="font-size: 13px; font-weight: 600;">Complete Registration</span>
+                <span style="font-size: 12px; font-weight: 500;">Meta Pixel</span>
+                <span style="font-size: 12px; color: var(--color-text-muted); font-family: monospace;">/onboarding/complete</span>
+                <span style="font-size: 12.5px; font-weight: 600; color: #059669;">98%</span>
+                <ui-badge variant="success">Firing</ui-badge>
+              </div>
+              <div style="display: grid; grid-template-columns: 180px 120px 1fr 100px 110px; gap: 10px; align-items: center; padding: 10px 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px;">
+                <span style="font-size: 13px; font-weight: 600;">Schedule Demo Click</span>
+                <span style="font-size: 12px; font-weight: 500;">TikTok Pixel</span>
+                <span style="font-size: 12px; color: var(--color-text-muted); font-family: monospace;">button#btn-demo</span>
+                <span style="font-size: 12.5px; font-weight: 600; color: #D97706;">85%</span>
+                <ui-badge variant="info">Under Review</ui-badge>
+              </div>
+            </div>
+          </section>
+        }
+
         <!-- Tasks tab -->
         @if (activeTab() === 'tasks') {
           <div class="filter-row" role="group" aria-label="Filter by status">
@@ -455,11 +540,13 @@ export class PaidDept implements OnInit {
   protected allTasks    = signal<PaidTask[]>([]);
 
   readonly tabs = [
-    { id: 'projects' as TabId, label: 'Projects',            count: computed(() => this.projects().length) },
-    { id: 'live'     as TabId, label: 'Live Campaigns',      count: computed(() => 0) },
-    { id: 'budget'   as TabId, label: 'Budget & Strategy',   count: computed(() => this.projects().filter(p => !!p.budget).length) },
-    { id: 'adcopy'   as TabId, label: 'Ad Copy',             count: computed(() => 0) },
-    { id: 'tasks'    as TabId, label: 'Tasks',               count: computed(() => this.allTasks().length) },
+    { id: 'projects'    as TabId, label: 'Projects',            count: computed(() => this.projects().length) },
+    { id: 'live'        as TabId, label: 'Live Campaigns',      count: computed(() => 0) },
+    { id: 'budget'      as TabId, label: 'Budgets & Strategy',  count: computed(() => 0) },
+    { id: 'adcopy'      as TabId, label: 'Ad Copy AI',          count: computed(() => 0) },
+    { id: 'creatives'   as TabId, label: 'Ad Creatives',        count: computed(() => 3) },
+    { id: 'conversions' as TabId, label: 'Conversion Log',      count: computed(() => 4) },
+    { id: 'tasks'       as TabId, label: 'Tasks',               count: computed(() => this.allTasks().length) },
   ];
 
   // ── Live campaigns ─────────────────────────────────────────────────────────

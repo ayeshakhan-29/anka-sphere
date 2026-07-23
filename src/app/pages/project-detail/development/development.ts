@@ -296,9 +296,13 @@ const QUEUE_STATUS_ORDER: QueueItemStatus[] = ['QUEUED', 'IN_PROGRESS', 'IN_QA',
             <div class="shared-header">
               <div>
                 <h4 class="shared-title">Approved Content</h4>
-                <p class="shared-sub">Approved pages from the Written Content stage — read-only</p>
+                <p class="shared-sub">Approved pages from the Written Content stage — strict read-only mode</p>
               </div>
               <span class="shared-badge">{{ approvedPages().length }} approved</span>
+            </div>
+            <div class="read-only-banner" style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; font-size: 12.5px; color: #1E40AF; margin-bottom: 16px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span><strong>Strict Read-Only:</strong> Approved written content is locked for deployment. Edits must be performed in Product Modelling.</span>
             </div>
             @if (approvedPages().length === 0) {
               <div class="shared-empty" role="status">

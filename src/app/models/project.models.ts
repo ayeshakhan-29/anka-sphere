@@ -634,3 +634,93 @@ export interface SocialPostInput {
   status?: 'DRAFT' | 'SCHEDULED';
   createdByName?: string | null;
 }
+
+// ── Extended Marketing & SEO Interfaces ─────────────────────────────────────
+
+export interface EmailCampaign {
+  id: string;
+  projectId: string;
+  name: string;
+  audienceSegment?: string;
+  subjectLines?: string[];
+  bodyCopy?: string;
+  cta?: string;
+  sendDate?: string;
+  status: 'DRAFT' | 'SCHEDULED' | 'SENT' | 'ARCHIVED';
+  createdAt: string;
+}
+
+export interface ContentRepurpose {
+  id: string;
+  projectId: string;
+  sourcePageId?: string;
+  sourcePage?: ContentPage;
+  targetFormat: 'CAROUSEL' | 'LINKEDIN_POST' | 'EMAIL_SNIPPET' | 'TWEET_THREAD' | 'VIDEO_SCRIPT';
+  title: string;
+  notes?: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface CommunityQueueItem {
+  id: string;
+  projectId: string;
+  platform: SocialPlatform;
+  userHandle: string;
+  message: string;
+  postTitle?: string;
+  assignedTo?: string;
+  status: 'NEEDS_RESPONSE' | 'IN_PROGRESS' | 'RESPONDED' | 'ESCALATED';
+  responseBody?: string;
+  respondedAt?: string;
+  createdAt: string;
+}
+
+export interface AdCreative {
+  id: string;
+  projectId: string;
+  title: string;
+  format: 'STATIC_IMAGE' | 'VIDEO' | 'CAROUSEL' | 'TEXT';
+  network: 'GOOGLE' | 'META';
+  mediaUrl?: string;
+  headline?: string;
+  bodyCopy?: string;
+  targetAdSet?: string;
+  status: 'DRAFT' | 'IN_REVIEW' | 'ACTIVE' | 'PAUSED' | 'REJECTED';
+  createdAt: string;
+}
+
+export interface ConversionEvent {
+  id: string;
+  projectId: string;
+  eventName: string;
+  platform: string;
+  triggerUrl?: string;
+  firingRate?: number;
+  status: 'FIRING' | 'NOT_FIRING' | 'UNVERIFIED' | 'UNDER_REVIEW';
+  lastFiredAt?: string;
+  createdAt: string;
+}
+
+export interface Backlink {
+  id: string;
+  projectId: string;
+  sourceDomain: string;
+  targetPage: string;
+  anchorText: string;
+  daScore?: number;
+  status: 'LIVE' | 'LOST' | 'PENDING' | 'DISAVOWED';
+  acquiredAt?: string;
+  createdAt: string;
+}
+
+export interface KeywordRankLog {
+  id: string;
+  projectId: string;
+  keyword: string;
+  position: number;
+  previousPos?: number;
+  clusterName?: string;
+  checkedAt: string;
+}
+
