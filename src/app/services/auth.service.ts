@@ -37,6 +37,10 @@ export class AuthService {
   readonly token = this._token.asReadonly();
   readonly isLoggedIn = computed(() => !!this._token());
 
+  registerUser(data: { name: string; email: string; password: string; role: string }) {
+    return this.api.post<{ token: string; user: AuthUser }>('/auth/register', data);
+  }
+
   login(email: string, password: string) {
     return this.api.post<LoginResponse>('/auth/login', { email, password }).pipe(
       timeout(15000),

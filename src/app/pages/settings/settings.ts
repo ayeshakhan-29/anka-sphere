@@ -1,5 +1,6 @@
 import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { NotificationService } from '../../services/notification.service';
@@ -150,7 +151,7 @@ const ROLE_COLOR: Partial<Record<UserRole, string>> = {
 
 @Component({
   selector: 'app-settings',
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="settings-page">
 
@@ -252,6 +253,54 @@ const ROLE_COLOR: Partial<Record<UserRole, string>> = {
       <!-- Team tab -->
       @if (activeTab() === 'team') {
         <div class="tab-panel">
+
+          <!-- Admin User Registration Card -->
+          @if (user()?.role === 'ADMIN') {
+            <div class="info-card" style="margin-bottom: 20px; border: 1px solid var(--color-border); background: var(--color-surface);">
+              <div class="info-card-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 18px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                  <span style="font-weight: 700; color: var(--color-text);">Admin Panel: Register User & Assign Role</span>
+                </div>
+                <button type="button" class="btn-connect" style="height: 28px; padding: 0 14px; font-size: 12px;" (click)="showRegForm.set(!showRegForm())">
+                  {{ showRegForm() ? 'Close Registration Form' : '+ Register New User' }}
+                </button>
+              </div>
+
+              @if (showRegForm()) {
+                <form (submit)="submitRegister($event)" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 14px;">
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;">
+                    <div>
+                      <label style="font-size: 12px; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px; display: block;">Full Name</label>
+                      <input class="field-input" type="text" [value]="regName()" (input)="regName.set($any($event.target).value)" placeholder="e.g. Sarah Jenkins" required style="width: 100%; box-sizing: border-box; height: 36px; padding: 0 10px; border-radius: var(--radius-md); border: 1px solid var(--color-border); background: var(--color-surface-raised); color: var(--color-text); font-size: 13px;" />
+                    </div>
+                    <div>
+                      <label style="font-size: 12px; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px; display: block;">Email Address</label>
+                      <input class="field-input" type="email" [value]="regEmail()" (input)="regEmail.set($any($event.target).value)" placeholder="sarah@anka.agency" required style="width: 100%; box-sizing: border-box; height: 36px; padding: 0 10px; border-radius: var(--radius-md); border: 1px solid var(--color-border); background: var(--color-surface-raised); color: var(--color-text); font-size: 13px;" />
+                    </div>
+                    <div>
+                      <label style="font-size: 12px; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px; display: block;">Password</label>
+                      <input class="field-input" type="password" [value]="regPassword()" (input)="regPassword.set($any($event.target).value)" placeholder="At least 8 characters" required minlength="8" style="width: 100%; box-sizing: border-box; height: 36px; padding: 0 10px; border-radius: var(--radius-md); border: 1px solid var(--color-border); background: var(--color-surface-raised); color: var(--color-text); font-size: 13px;" />
+                    </div>
+                    <div>
+                      <label style="font-size: 12px; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px; display: block;">Assign Role</label>
+                      <select [value]="regRole()" (change)="regRole.set($any($event.target).value)" style="width: 100%; box-sizing: border-box; height: 36px; padding: 0 10px; border-radius: var(--radius-md); border: 1px solid var(--color-border); background: var(--color-surface-raised); color: var(--color-text); font-size: 13px;">
+                        @for (r of allRoles; track r.value) {
+                          <option [value]="r.value">{{ r.label }}</option>
+                        }
+                      </select>
+                    </div>
+                  </div>
+                  <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px;">
+                    <button type="button" class="btn-outline-sm" (click)="showRegForm.set(false)">Cancel</button>
+                    <button type="submit" class="btn-connect" [disabled]="registering()">
+                      {{ registering() ? 'Registering...' : 'Register User & Assign Role' }}
+                    </button>
+                  </div>
+                </form>
+              }
+            </div>
+          }
 
           @if (teamLoading()) {
             <div class="loading-state" role="status"><div class="spinner" aria-hidden="true"></div>Loading team…</div>
@@ -595,6 +644,63 @@ export class Settings implements OnInit {
   protected projectCount = signal(0);
   protected teamLoading = signal(true);
 
+  // Admin Registration
+  readonly allRoles: { value: UserRole; label: string }[] = [
+    { value: 'ADMIN',                       label: 'Admin (Full System Access)' },
+    { value: 'MANAGER_PRODUCT_MODELLING',   label: 'Manager — Product Modelling (Stage 1)' },
+    { value: 'MANAGER_PRODUCT_DEVELOPMENT', label: 'Manager — Product Development (Stage 2-3)' },
+    { value: 'MANAGER_PRODUCT_GROWTH',      label: 'Manager — Product Growth (Stage 4-5)' },
+    { value: 'CONTENT_WRITER',              label: 'Content Writer (Written Content)' },
+    { value: 'DESIGNER',                    label: 'Designer (Assets & Design)' },
+    { value: 'DEVELOPER',                   label: 'Developer (Code & Repository)' },
+    { value: 'SOCIAL_MEDIA',                label: 'Social Media Specialist' },
+    { value: 'PAID_ADS',                    label: 'Paid Ads Specialist' },
+    { value: 'SEO',                         label: 'SEO Specialist' },
+  ];
+
+  protected showRegForm   = signal(false);
+  protected regName       = signal('');
+  protected regEmail      = signal('');
+  protected regPassword   = signal('');
+  protected regRole       = signal<UserRole>('DEVELOPER');
+  protected registering   = signal(false);
+
+  protected submitRegister(event: Event) {
+    event.preventDefault();
+    const name = this.regName().trim();
+    const email = this.regEmail().trim();
+    const password = this.regPassword();
+    const role = this.regRole();
+
+    if (!name || !email || !password) {
+      this.notifService.toast('Please fill out all required fields.', 'warning');
+      return;
+    }
+    if (password.length < 8) {
+      this.notifService.toast('Password must be at least 8 characters long.', 'warning');
+      return;
+    }
+
+    this.registering.set(true);
+    this.auth.registerUser({ name, email, password, role }).subscribe({
+      next: (res) => {
+        this.registering.set(false);
+        this.showRegForm.set(false);
+        this.notifService.toast(`User "${res.user.name}" successfully registered with role: ${res.user.role}!`, 'success');
+        this.regName.set('');
+        this.regEmail.set('');
+        this.regPassword.set('');
+        this.regRole.set('DEVELOPER');
+        this.loadTeam();
+      },
+      error: (err) => {
+        this.registering.set(false);
+        const msg = err?.error?.error || 'Failed to register user.';
+        this.notifService.toast(msg, 'warning');
+      },
+    });
+  }
+
   // Integrations
   readonly integrationCards = INTEGRATION_CARDS;
   protected integrations = signal<IntegrationInfo[]>([]);
@@ -684,7 +790,10 @@ export class Settings implements OnInit {
       }
     }
     this.loadIntegrations();
+    this.loadTeam();
+  }
 
+  private loadTeam() {
     this.projectService.getProjects().subscribe({
       next: (projects) => {
         this.projectCount.set(projects.length);
