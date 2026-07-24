@@ -1040,7 +1040,7 @@ const QUEUE_STATUS_ORDER: QueueItemStatus[] = ['QUEUED', 'IN_PROGRESS', 'IN_QA',
     .gate-pill { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; }
     .gate-pill.soft { background: #FEF3C7; color: #D97706; }
 
-    .tab-nav { display: flex; gap: 2px; border-bottom: 1px solid var(--color-border); margin: 0 -24px; padding: 0 24px; }
+    .tab-nav { display: flex; gap: 2px; border-bottom: 1px solid var(--color-border); margin: 0 -24px; padding: 0 24px; overflow-x: auto; scrollbar-width: thin; }
     .tab-btn {
       display: flex; align-items: center; gap: 6px; padding: 8px 14px; border: none;
       background: transparent; font-family: var(--font-sans); font-size: 13px; font-weight: 500;
@@ -1442,7 +1442,7 @@ export class DevelopmentTab implements OnInit, OnDestroy {
     { id: 'plugins'     as TabId, label: 'Plugins',         badge: () => this.plugins().length > 0 ? this.plugins().length : null },
     { id: 'themes'      as TabId, label: 'Themes',          badge: () => this.themes().length > 0 ? this.themes().length : null },
     { id: 'maintenance' as TabId, label: 'Maintenance Mode', badge: () => null as number | null },
-    { id: 'gate'        as TabId, label: 'Soft Gate',       badge: () => null as number | null },
+    { id: 'gate'        as TabId, label: 'Review & Gate',   badge: () => null as number | null },
   ];
 
   protected approvedAssets = computed(() =>
