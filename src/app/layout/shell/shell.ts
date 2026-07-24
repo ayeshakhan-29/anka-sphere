@@ -691,26 +691,26 @@ export class Shell implements OnInit, OnDestroy {
   protected themeService = inject(ThemeService);
   @ViewChild('pageContent') private pageContent!: ElementRef<HTMLElement>;
 
-  protected sidebarCollapsed = signal(false);
-
-  private savedScroll = 0;
-  private routerSub!: Subscription;
+  protected currentUrl = signal(typeof window !== 'undefined' ? window.location.pathname : '/app/projects');
 
   protected pageTitle = computed(() => {
-    const url = window.location.pathname;
-    if (url.includes('projects')) return 'Projects';
-    if (url.includes('profiling')) return 'Project Profiling';
-    if (url.includes('written-content')) return 'Written Content';
-    if (url.includes('design')) return 'Design';
-    if (url.includes('development')) return 'Development';
-    if (url.includes('analytics')) return 'Analytics Hub';
-    if (url.includes('social')) return 'Social Media';
-    if (url.includes('paid')) return 'Paid Marketing';
-    if (url.includes('seo')) return 'SEO';
-    if (url.includes('reporting')) return 'Reporting';
-    if (url.includes('maintenance')) return 'Maintenance';
+    const url = this.currentUrl();
+    if (url.includes('/maintenance')) return 'Maintenance';
+    if (url.includes('/settings')) return 'Settings';
+    if (url.includes('/content-marketing')) return 'Content Marketing';
+    if (url.includes('/written-content') || url.includes('/content')) return 'Written Content';
+    if (url.includes('/profiling')) return 'Project Profiling';
+    if (url.includes('/design')) return 'Design';
+    if (url.includes('/development')) return 'Development';
+    if (url.includes('/analytics')) return 'Analytics Hub';
+    if (url.includes('/social')) return 'Social Media';
+    if (url.includes('/paid')) return 'Paid Marketing';
+    if (url.includes('/seo')) return 'SEO';
+    if (url.includes('/reporting')) return 'Reporting';
+    if (url.includes('/projects')) return 'Projects';
     return 'Dashboard';
   });
+
 
   protected navGroups: NavGroup[] = [
     {
@@ -811,6 +811,9 @@ export class Shell implements OnInit, OnDestroy {
     }
   ];
 
+  protected sidebarCollapsed = signal(false);
+  private savedScroll = 0;
+  private routerSub!: Subscription;
   private router = inject(Router);
   private auth = inject(AuthService);
   protected notifService = inject(NotificationService);
@@ -828,16 +831,18 @@ export class Shell implements OnInit, OnDestroy {
         }
       }
       if (event instanceof NavigationEnd) {
+        this.currentUrl.set(event.urlAfterRedirects);
         // Restore on same-page tab switches; reset only on top-level page changes
         const el = this.pageContent?.nativeElement;
         if (!el) return;
         const isTopLevel = ['projects', 'profiling', 'written-content', 'design', 'development',
-          'analytics', 'content-marketing', 'social', 'paid', 'seo', 'reporting', 'maintenance']
+          'analytics', 'content-marketing', 'social', 'paid', 'seo', 'reporting', 'maintenance', 'settings']
           .some(p => event.urlAfterRedirects === `/app/${p}`);
         el.scrollTop = isTopLevel ? 0 : this.savedScroll;
       }
     });
   }
+
 
   ngOnDestroy() {
     this.routerSub?.unsubscribe();

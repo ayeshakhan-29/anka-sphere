@@ -6,6 +6,7 @@ import { NotificationService } from '../../services/notification.service';
 import { ProjectService } from '../../services/project.service';
 import { IntegrationService, OAuthProviderSlug } from '../../services/integration.service';
 import { UserRole, IntegrationInfo, IntegrationProvider } from '../../models/project.models';
+import { environment } from '../../environments/environment';
 
 type TabId = 'profile' | 'team' | 'integrations' | 'notifications';
 
@@ -29,8 +30,8 @@ const INTEGRATION_CARDS: IntegrationCard[] = [
       'Go to console.cloud.google.com → create/select a project.',
       'Enable APIs: "Google Analytics Data API", "Search Console API", "Google Ads API".',
       'APIs & Services → OAuth consent screen → External → add your users as test users.',
-      'Credentials → Create OAuth client ID → Web application → add the redirect URI shown in your server env (GOOGLE_OAUTH_REDIRECT_URI).',
-      'Copy Client ID/Secret into the server .env (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET), restart, then hit Connect below.',
+      'Credentials → Create OAuth client ID → Web application → Under "Authorized redirect URIs", paste the exact Callback URL copied above.',
+      'Copy Client ID/Secret into server .env (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET) & set GOOGLE_OAUTH_REDIRECT_URI, restart, then hit Connect below.',
       'For Google Ads also request a developer token at ads.google.com → Tools → API Center and set GOOGLE_ADS_DEVELOPER_TOKEN.',
     ],
   },
@@ -39,10 +40,10 @@ const INTEGRATION_CARDS: IntegrationCard[] = [
     what: 'Publish posts to FB Pages / IG business accounts and pull ad campaign insights into the Paid department.',
     cost: 'Free (Graph API). ~20 min setup; app review needed for production publishing.',
     steps: [
-      'Go to developers.facebook.com → Create App → type "Business".',
+      'Go to developers.facebook.com → Create App → Select "Business" app type.',
       'Add products: "Facebook Login for Business" and "Marketing API".',
-      'Settings → Basic: copy App ID / App Secret into server .env (META_APP_ID / META_APP_SECRET).',
-      'Facebook Login → Settings → add the /integrations/meta/callback redirect URI.',
+      'Facebook Login → Settings → Under "Valid OAuth Redirect URIs", paste the exact Callback URL copied above.',
+      'Settings → Basic: Copy App ID / App Secret into server .env (META_APP_ID / META_APP_SECRET).',
       'Link an Instagram business account to your Facebook Page for IG publishing.',
       'Restart the server and hit Connect below.',
     ],
@@ -54,8 +55,8 @@ const INTEGRATION_CARDS: IntegrationCard[] = [
     steps: [
       'Go to developers.tiktok.com → Manage apps → Create app.',
       'Add the "Content Posting API" product and request video.publish / video.upload scopes.',
+      'Under "Redirect URI / Callback URL", paste the exact Callback URL copied above.',
       'Copy Client Key / Client Secret into server .env (TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET).',
-      'Register the /integrations/tiktok/callback redirect URI.',
       'Restart the server and hit Connect below.',
     ],
   },
@@ -343,6 +344,22 @@ const ROLE_COLOR: Partial<Record<UserRole, string>> = {
                   }
                   <p class="int-what">{{ card.what }}</p>
                   <p class="int-cost">💰 {{ card.cost }}</p>
+
+                  @if (card.kind === 'oauth' && card.slug) {
+                    <div class="callback-url-box">
+                      <div class="cb-header">
+                        <span class="cb-title">⚡ Authorized Redirect URI (Callback URL)</span>
+                        <span class="cb-sub">Copy and paste this exact URL into your {{ card.name.split(' ')[0] }} Developer Console under <strong>Valid OAuth Redirect URIs</strong>:</span>
+                      </div>
+                      <div class="cb-row">
+                        <code class="cb-code">{{ getCallbackUrl(card.slug) }}</code>
+                        <button type="button" class="btn-copy-cb" (click)="copyCallbackUrl(card.slug)">
+                          {{ copiedSlug() === card.slug ? 'Copied! ✓' : 'Copy Callback URL' }}
+                        </button>
+                      </div>
+                    </div>
+                  }
+
                   <details class="int-guide">
                     <summary>Click-by-click setup guide</summary>
                     <ol class="int-steps">
@@ -507,6 +524,26 @@ const ROLE_COLOR: Partial<Record<UserRole, string>> = {
     .int-guide summary { font-size: 12.5px; font-weight: 600; color: var(--color-accent, #6366F1); cursor: pointer; }
     .int-steps { margin: 8px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 5px; }
     .int-steps li { font-size: 12.5px; color: var(--color-text-secondary); line-height: 1.5; }
+
+    /* Callback URL Box */
+    .callback-url-box {
+      margin: 6px 0 2px;
+      padding: 12px 14px;
+      background: var(--color-surface-raised, #F8FAFC);
+      border: 1px solid var(--color-border, #E2E8F0);
+      border-left: 3.5px solid var(--color-accent, #6366F1);
+      border-radius: var(--radius-md, 8px);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .cb-header { display: flex; flex-direction: column; gap: 2px; }
+    .cb-title { font-size: 12px; font-weight: 700; color: var(--color-text); }
+    .cb-sub { font-size: 11.5px; color: var(--color-text-muted); }
+    .cb-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
+    .cb-code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; padding: 6px 10px; background: rgba(0,0,0,0.06); border-radius: 6px; color: #0F172A; word-break: break-all; flex: 1; border: 1px solid rgba(0,0,0,0.08); }
+    .btn-copy-cb { height: 30px; padding: 0 12px; font-size: 11.5px; font-weight: 600; background: var(--color-accent, #6366F1); color: #fff; border: none; border-radius: 6px; cursor: pointer; white-space: nowrap; transition: opacity 0.15s; }
+    .btn-copy-cb:hover { opacity: 0.9; }
 
     /* Notifications */
     .notif-section { display: flex; flex-direction: column; gap: 8px; }
@@ -745,5 +782,26 @@ export class Settings implements OnInit {
     const hrs = Math.floor(mins / 60);
     if (hrs < 24) return `${hrs}h ago`;
     return `${Math.floor(hrs / 24)}d ago`;
+  }
+
+  protected copiedSlug = signal<string | null>(null);
+
+  protected getCallbackUrl(slug?: OAuthProviderSlug): string {
+    if (!slug) return '';
+    const base = environment.apiUrl
+      ? environment.apiUrl
+      : (typeof window !== 'undefined' ? window.location.origin : '');
+    return `${base.replace(/\/$/, '')}/integrations/${slug}/callback`;
+  }
+
+  protected copyCallbackUrl(slug?: OAuthProviderSlug) {
+    if (!slug) return;
+    const url = this.getCallbackUrl(slug);
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(() => {
+        this.copiedSlug.set(slug);
+        setTimeout(() => this.copiedSlug.set(null), 2500);
+      });
+    }
   }
 }
