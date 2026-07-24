@@ -6,7 +6,7 @@ import { NotificationService } from '../../services/notification.service';
 import { ProjectService } from '../../services/project.service';
 import { IntegrationService, OAuthProviderSlug } from '../../services/integration.service';
 import { UserRole, IntegrationInfo, IntegrationProvider } from '../../models/project.models';
-import { environment } from '../../environments/environment';
+import { environment } from '../../../environments/environment';
 
 type TabId = 'profile' | 'team' | 'integrations' | 'notifications';
 
