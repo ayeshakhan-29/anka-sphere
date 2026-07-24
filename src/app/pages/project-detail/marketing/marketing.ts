@@ -1,10 +1,12 @@
 import { Component, signal, computed, inject, OnInit } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+
 import { ProjectService } from '../../../services/project.service';
 import { ProjectStateService } from '../../../services/project-state.service';
 import { AuthService } from '../../../services/auth.service';
 import { NotificationService } from '../../../services/notification.service';
+import { IntegrationService } from '../../../services/integration.service';
 import { MarketingTask, MarketingTaskCategory, DesignAsset, ContentPage } from '../../../models/project.models';
 
 type AssetType = DesignAsset['type'];
@@ -121,7 +123,8 @@ const CAT_COLORS: Partial<Record<string, string>> = {
           </div>
 
           <!-- Live Dashboards -->
-          <div class="live-section">
+          <div class="live-section" style="margin-top: 20px;">
+
             <div class="live-header">
               <h3 class="live-title">Live Metrics & Performance</h3>
               <button class="ftab" (click)="loadLiveMetrics()" [disabled]="liveLoading()">↻ Refresh Metrics</button>
@@ -205,6 +208,129 @@ const CAT_COLORS: Partial<Record<string, string>> = {
 
         </section>
       }
+
+      <!-- ── Tab: Social Credentials (Meta & TikTok) ── -->
+      @if (activeTab() === 'social') {
+        <section class="tab-panel" aria-label="Social Credentials & Account Integration">
+          
+          <!-- Social Credentials Form -->
+          <div class="creds-card">
+            <div class="creds-header">
+              <div>
+                <h3 class="creds-title">Project Social API Credentials (Meta & TikTok)</h3>
+                <p class="creds-sub">Provide project-specific Meta App ID, Meta App Secret, TikTok Client Key, and TikTok Client Secret so each project uses its own developer credentials.</p>
+              </div>
+            </div>
+
+            <form [formGroup]="socialForm" (ngSubmit)="saveSocialCredentials()" class="brief-form">
+              <div class="form-grid">
+                <div class="field">
+                  <div class="field-link-wrap">
+                    <label class="field-label" for="meta-app-id">META_APP_ID</label>
+                    <a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener" class="field-help-link">Meta Console →</a>
+                  </div>
+                  <input id="meta-app-id" class="field-input" type="text" formControlName="metaAppId" placeholder="e.g. 123456789012345" />
+                </div>
+                <div class="field">
+                  <div class="field-link-wrap">
+                    <label class="field-label" for="meta-app-secret">META_APP_SECRET</label>
+                    <a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener" class="field-help-link">App Secret →</a>
+                  </div>
+                  <input id="meta-app-secret" class="field-input" type="password" formControlName="metaAppSecret" placeholder="••••••••••••••••" />
+                </div>
+                <div class="field">
+                  <div class="field-link-wrap">
+                    <label class="field-label" for="tiktok-client-key">TIKTOK_CLIENT_KEY</label>
+                    <a href="https://developers.tiktok.com/" target="_blank" rel="noopener" class="field-help-link">TikTok Portal →</a>
+                  </div>
+                  <input id="tiktok-client-key" class="field-input" type="text" formControlName="tiktokClientKey" placeholder="e.g. awxxxxxxxxxxxxxx" />
+                </div>
+                <div class="field">
+                  <div class="field-link-wrap">
+                    <label class="field-label" for="tiktok-client-secret">TIKTOK_CLIENT_SECRET</label>
+                    <a href="https://developers.tiktok.com/" target="_blank" rel="noopener" class="field-help-link">Client Secret →</a>
+                  </div>
+                  <input id="tiktok-client-secret" class="field-input" type="password" formControlName="tiktokClientSecret" placeholder="••••••••••••••••" />
+                </div>
+              </div>
+              <div class="form-footer">
+                @if (socialCredsSuccess()) {
+                  <span class="save-ok" role="status">Social Credentials Saved!</span>
+                }
+                <button class="btn-primary" type="submit" [disabled]="savingSocialCreds()">
+                  {{ savingSocialCreds() ? 'Saving…' : 'Save Social Credentials' }}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Social & Paid Integrations Card (Project Specific) -->
+          <div class="creds-card" style="margin-top: 20px;">
+            <div class="creds-header">
+              <div>
+                <h3 class="creds-title">Project Social & Paid Integrations (Meta & TikTok)</h3>
+                <p class="creds-sub">Connect project-specific Meta and TikTok accounts to enable organic publishing and paid campaign tracking for this project.</p>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; padding: 14px 0 0;">
+              <!-- Meta Card -->
+              <div style="padding: 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 13.5px; font-weight: 600; color: var(--color-text);">Meta (Facebook + Instagram)</span>
+                  @if (isMetaConnected()) {
+                    <span class="conn-status-badge conn-status-badge--connected" style="margin: 0;"><span class="status-dot status-dot--green"></span> Connected</span>
+                  } @else {
+                    <span class="conn-status-badge conn-status-badge--off" style="margin: 0;"><span class="status-dot status-dot--gray"></span> Disconnected</span>
+                  }
+                </div>
+                <p style="font-size: 12px; color: var(--color-text-muted); margin: 0; line-height: 1.4;">
+                  @if (isMetaConnected()) {
+                    Connected as: <strong>{{ metaAccountName() || 'Meta Page' }}</strong>
+                  } @else {
+                    Authorize page-level publishing and ad campaign insights specifically for this project.
+                  }
+                </p>
+                <div style="display: flex; gap: 8px; margin-top: 6px;">
+                  @if (isMetaConnected()) {
+                    <button class="btn-sec-outline" type="button" style="height: 32px; font-size: 12px;" (click)="disconnectProvider('meta')">Disconnect</button>
+                  } @else {
+                    <button class="btn-primary" type="button" style="height: 32px; font-size: 12px;" (click)="connectProvider('meta')">Connect Meta</button>
+                  }
+                </div>
+              </div>
+
+              <!-- TikTok Card -->
+              <div style="padding: 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 13.5px; font-weight: 600; color: var(--color-text);">TikTok API</span>
+                  @if (isTiktokConnected()) {
+                    <span class="conn-status-badge conn-status-badge--connected" style="margin: 0;"><span class="status-dot status-dot--green"></span> Connected</span>
+                  } @else {
+                    <span class="conn-status-badge conn-status-badge--off" style="margin: 0;"><span class="status-dot status-dot--gray"></span> Disconnected</span>
+                  }
+                </div>
+                <p style="font-size: 12px; color: var(--color-text-muted); margin: 0; line-height: 1.4;">
+                  @if (isTiktokConnected()) {
+                    Connected as: <strong>{{ tiktokAccountName() || 'TikTok Profile' }}</strong>
+                  } @else {
+                    Authorize video publishing and pixel conversion events specifically for this project.
+                  }
+                </p>
+                <div style="display: flex; gap: 8px; margin-top: 6px;">
+                  @if (isTiktokConnected()) {
+                    <button class="btn-sec-outline" type="button" style="height: 32px; font-size: 12px;" (click)="disconnectProvider('tiktok')">Disconnect</button>
+                  } @else {
+                    <button class="btn-primary" type="button" style="height: 32px; font-size: 12px;" (click)="connectProvider('tiktok')">Connect TikTok</button>
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </section>
+      }
+
 
       <!-- ── Tab: Strategy Brief ── -->
       @if (activeTab() === 'brief') {
@@ -635,14 +761,22 @@ const CAT_COLORS: Partial<Record<string, string>> = {
 })
 export class MarketingTab implements OnInit {
   private route          = inject(ActivatedRoute);
+  private router         = inject(Router);
   private projectService = inject(ProjectService);
   private state          = inject(ProjectStateService);
   private fb             = inject(FormBuilder);
   private notifService   = inject(NotificationService);
+  private integrationService = inject(IntegrationService);
+
+
+  protected isMetaConnected = signal(false);
+  protected isTiktokConnected = signal(false);
+  protected metaAccountName = signal<string | null>(null);
+  protected tiktokAccountName = signal<string | null>(null);
 
   private projectId = '';
 
-  protected activeTab  = signal<'analytics' | 'brief' | 'kanban' | 'assets' | 'content' | 'gate'>('analytics');
+  protected activeTab  = signal<'analytics' | 'social' | 'brief' | 'kanban' | 'assets' | 'content' | 'gate'>('analytics');
   protected saving     = signal(false);
   protected saveSuccess = signal(false);
   protected savingCreds = signal(false);
@@ -670,6 +804,7 @@ export class MarketingTab implements OnInit {
 
   readonly tabs = [
     { id: 'analytics' as const, label: 'Google Analytics & Ads' },
+    { id: 'social'    as const, label: 'Social Credentials (Meta & TikTok)' },
     { id: 'brief'     as const, label: 'Strategy Brief' },
     { id: 'kanban'    as const, label: 'Task Board' },
     { id: 'assets'    as const, label: 'Design Assets' },
@@ -693,6 +828,21 @@ export class MarketingTab implements OnInit {
     searchConsoleUrl:    [''],
     googleAdsAccountId:  [''],
   });
+
+  protected socialForm = this.fb.group({
+    metaAppId:          [''],
+    metaAppSecret:      [''],
+    tiktokClientKey:    [''],
+    tiktokClientSecret: [''],
+  });
+
+  protected savingSocialCreds = signal<boolean>(false);
+  protected socialCredsSuccess = signal<boolean>(false);
+  protected hasMetaAppId = signal<boolean>(false);
+  protected maskedMetaAppId = signal<string | null>(null);
+  protected hasTiktokClientKey = signal<boolean>(false);
+  protected maskedTiktokClientKey = signal<string | null>(null);
+
 
   protected isCompleted   = computed(() => !!this.state.project()?.marketing?.completedAt);
   protected openTaskCount = computed(() => this.tasks().filter(t => t.status !== 'DONE').length);
@@ -725,7 +875,39 @@ export class MarketingTab implements OnInit {
       this.tasks.set(mkt.tasks ?? []);
     }
     this.loadProjectGoogleCredentials();
+    this.loadProjectSocialCredentials();
+    this.loadProjectIntegrations();
     this.loadLiveMetrics();
+
+
+    this.route.queryParams.subscribe(params => {
+      const integration = params['integration'];
+      if (!integration) return;
+
+      this.activeTab.set('social');
+      this.loadProjectIntegrations();
+      this.loadProjectSocialCredentials();
+
+      if (integration === 'meta_connected') {
+        this.notifService.toast('Meta connected successfully for this project!', 'success');
+      } else if (integration === 'tiktok_connected') {
+        this.notifService.toast('TikTok connected successfully for this project!', 'success');
+      } else if (integration === 'meta_denied' || integration === 'meta_error') {
+        this.notifService.toast('Failed to connect Meta account.', 'warning');
+      } else if (integration === 'tiktok_denied' || integration === 'tiktok_error') {
+        this.notifService.toast('Failed to connect TikTok account.', 'warning');
+      }
+
+      // Remove query param from browser URL so page reloads do not trigger the toast repeatedly
+      this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { integration: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    });
+
+
   }
 
   protected credsStatus = signal<string>('NOT_CONFIGURED');
@@ -784,6 +966,42 @@ export class MarketingTab implements OnInit {
       error: () => this.savingCreds.set(false),
     });
   }
+
+  protected loadProjectSocialCredentials() {
+    if (!this.projectId) return;
+    this.projectService.getProjectSocialCredentials(this.projectId).subscribe({
+      next: (res) => {
+        this.hasMetaAppId.set(res.hasMetaAppId);
+        this.maskedMetaAppId.set(res.maskedMetaAppId);
+        this.hasTiktokClientKey.set(res.hasTiktokClientKey);
+        this.maskedTiktokClientKey.set(res.maskedTiktokClientKey);
+        this.socialForm.patchValue({
+          metaAppId: res.maskedMetaAppId ?? '',
+          tiktokClientKey: res.maskedTiktokClientKey ?? '',
+        });
+      },
+    });
+  }
+
+  protected saveSocialCredentials() {
+    if (this.savingSocialCreds()) return;
+    this.savingSocialCreds.set(true);
+    this.socialCredsSuccess.set(false);
+    this.projectService.saveProjectSocialCredentials(this.projectId, this.socialForm.value as any).subscribe({
+      next: () => {
+        this.savingSocialCreds.set(false);
+        this.socialCredsSuccess.set(true);
+        this.notifService.toast('Social credentials saved successfully for this project!', 'success');
+        setTimeout(() => this.socialCredsSuccess.set(false), 2500);
+        this.loadProjectSocialCredentials();
+      },
+      error: (err) => {
+        this.savingSocialCreds.set(false);
+        this.notifService.toast(err.error?.error || 'Failed to save social credentials.', 'warning');
+      },
+    });
+  }
+
 
   protected loadLiveMetrics() {
     if (!this.projectId) return;
@@ -933,6 +1151,42 @@ export class MarketingTab implements OnInit {
         this.gateLoading.set(false);
         this.gateError.set(err?.error?.error ?? 'Gate approval failed.');
       },
+    });
+  }
+
+  protected loadProjectIntegrations() {
+    if (!this.projectId) return;
+    this.integrationService.getIntegrations(this.projectId).subscribe({
+      next: (res) => {
+        const meta = res.integrations.find(i => i.provider === 'META');
+        const tiktok = res.integrations.find(i => i.provider === 'TIKTOK');
+        this.isMetaConnected.set(meta?.status === 'CONNECTED');
+        this.isTiktokConnected.set(tiktok?.status === 'CONNECTED');
+        this.metaAccountName.set(meta?.accountName ?? null);
+        this.tiktokAccountName.set(tiktok?.accountName ?? null);
+      }
+    });
+  }
+
+  protected connectProvider(provider: 'meta' | 'tiktok') {
+    this.integrationService.getAuthUrl(provider, this.projectId).subscribe({
+      next: (res) => {
+        window.location.href = res.url;
+      },
+      error: (err) => {
+        const msg = err?.error?.message || err?.error?.error || `Please enter and save ${provider === 'meta' ? 'Meta App ID & App Secret' : 'TikTok Client Key & Client Secret'} in the form above first.`;
+        this.notifService.toast(msg, 'warning');
+      }
+    });
+  }
+
+
+  protected disconnectProvider(provider: 'meta' | 'tiktok') {
+    this.integrationService.disconnect(provider, this.projectId).subscribe({
+      next: () => {
+        this.loadProjectIntegrations();
+        this.notifService.toast(`${provider === 'meta' ? 'Meta' : 'TikTok'} disconnected successfully.`, 'success');
+      }
     });
   }
 }

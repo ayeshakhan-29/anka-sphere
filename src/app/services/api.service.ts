@@ -47,5 +47,12 @@ export class ApiService {
       responseType: 'text' as 'json',
     });
   }
+
+  getBlob(path: string) {
+    return this.http.get(`${this.base}${path}`, {
+      headers: this.authHeaders,
+      responseType: 'blob',
+    });
+  }
 }
 

@@ -25,6 +25,11 @@ interface NavGroup {
   template: `
     <div class="shell">
 
+      <!-- Sidebar backdrop on mobile -->
+      @if (!sidebarCollapsed()) {
+        <div class="mobile-sidebar-backdrop" (click)="sidebarCollapsed.set(true)"></div>
+      }
+
       <!-- Sidebar -->
       <aside class="sidebar" [class.collapsed]="sidebarCollapsed()">
 
@@ -111,7 +116,17 @@ interface NavGroup {
 
         <!-- Topbar -->
         <header class="topbar" role="banner">
-          <div class="topbar-left">
+          <div class="topbar-left" style="display: flex; align-items: center; gap: 12px;">
+            <button
+              class="mobile-menu-btn"
+              (click)="toggleSidebar()"
+              aria-label="Toggle menu"
+              style="background: transparent; border: none; padding: 6px; cursor: pointer; color: var(--color-text-secondary); display: none; align-items: center; justify-content: center;"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
+            </button>
             <h1 class="page-title">{{ pageTitle() }}</h1>
           </div>
           <div class="topbar-right">
@@ -621,6 +636,55 @@ interface NavGroup {
       overflow-y: auto;
       padding: 28px 28px;
     }
+
+    .mobile-sidebar-backdrop {
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      .mobile-menu-btn {
+        display: flex !important;
+      }
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: -260px;
+        height: 100vh;
+        z-index: 1000;
+        transition: left 0.3s ease, width 0.3s ease;
+        box-shadow: 4px 0 12px rgba(0,0,0,0.15);
+      }
+      .sidebar:not(.collapsed) {
+        left: 0;
+        width: 260px;
+        min-width: 260px;
+      }
+      .sidebar.collapsed {
+        left: -260px;
+        width: 260px;
+        min-width: 260px;
+      }
+      .mobile-sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 999;
+      }
+      .main-area {
+        width: 100%;
+      }
+      .topbar {
+        padding: 0 16px;
+      }
+      .page-content {
+        padding: 16px;
+      }
+      .notif-panel {
+        width: calc(100vw - 32px);
+        right: -16px;
+      }
+    }
   `]
 })
 export class Shell implements OnInit, OnDestroy {
@@ -753,9 +817,15 @@ export class Shell implements OnInit, OnDestroy {
   protected panelOpen = signal(false);
 
   ngOnInit() {
+    if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+      this.sidebarCollapsed.set(true);
+    }
     this.routerSub = this.router.events.subscribe(event => {
       if (event instanceof NavigationStart) {
         this.savedScroll = this.pageContent?.nativeElement?.scrollTop ?? 0;
+        if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+          this.sidebarCollapsed.set(true);
+        }
       }
       if (event instanceof NavigationEnd) {
         // Restore on same-page tab switches; reset only on top-level page changes

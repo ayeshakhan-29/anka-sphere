@@ -331,11 +331,58 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
           <section aria-label="AI image and video generation" class="ai-panel">
             <div class="ai-gen-card">
               <h3 class="ai-usage-title">AI Images</h3>
+
+              <!-- Prompt Templates selector -->
+              <div class="prompt-templates-row" style="margin-bottom: 12px; display: flex; gap: 8px; align-items: center;">
+                <div style="flex: 1;">
+                  <select class="ai-size-select" style="width: 100%; max-width: 100%;" [value]="selectedTemplateId()" (change)="onTemplateChange($any($event.target).value)" aria-label="Prompt template">
+                    <option value="">Select a saved prompt template...</option>
+                    @for (t of promptTemplates(); track t.id) {
+                      <option [value]="t.id">{{ t.name }}</option>
+                    }
+                  </select>
+                </div>
+                <button class="btn-save" style="margin: 0; padding: 8px 14px; font-size: 12.5px; display: flex; align-items: center; gap: 4px;" type="button" (click)="saveCurrentAsTemplate()" [disabled]="aiPrompt().trim().length < 3 || savingTemplate()">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  Save as Template
+                </button>
+                @if (selectedTemplateId()) {
+                  <button class="btn-ghost" style="color: #DC2626; margin: 0; padding: 8px 10px; font-size: 12.5px;" type="button" (click)="deleteTemplate(selectedTemplateId(), $event)">
+                    Delete Template
+                  </button>
+                }
+              </div>
+
               <label class="field-label" for="ai-prompt">Describe the image you need</label>
               <textarea id="ai-prompt" class="field-textarea" rows="3"
                 placeholder="e.g. Minimalist hero illustration of fresh vegetables on a pastel green background, soft studio lighting"
                 [value]="aiPrompt()" (input)="aiPrompt.set($any($event.target).value)"
                 [disabled]="aiGenerating()"></textarea>
+
+              <!-- Style presets & Variations -->
+              <div style="display: flex; gap: 12px; margin-top: 10px; margin-bottom: 12px;">
+                <div style="flex: 1;">
+                  <label class="field-label" style="font-size: 11.5px; margin-bottom: 4px; color: var(--color-text-muted);">Style Preset (Appended to prompt under-the-hood)</label>
+                  <select class="ai-size-select" style="width: 100%; max-width: 100%;" [value]="selectedStylePreset()" (change)="selectedStylePreset.set($any($event.target).value)">
+                    <option value="none">Manual / No Preset</option>
+                    <option value="photorealistic">Photorealistic (8k, detailed, commercial studio photo)</option>
+                    <option value="flat">Flat vector illustration (minimalist corporate graphic)</option>
+                    <option value="minimal">Minimalist (clean, simple negative space)</option>
+                    <option value="corporate">Professional Corporate (clean branding)</option>
+                    <option value="lifestyle">Lifestyle photography (authentic warm lighting)</option>
+                    <option value="product">Commercial Product Shot (studio reflection, key lighting)</option>
+                  </select>
+                </div>
+                <div style="width: 140px;">
+                  <label class="field-label" style="font-size: 11.5px; margin-bottom: 4px; color: var(--color-text-muted);">Variations (Batch)</label>
+                  <select class="ai-size-select" style="width: 100%;" [value]="aiCount()" (change)="aiCount.set(+$any($event.target).value)">
+                    <option [value]="1">1 variation</option>
+                    <option [value]="2">2 variations</option>
+                    <option [value]="3">3 variations</option>
+                  </select>
+                </div>
+              </div>
+
               <div class="ai-controls">
                 <select class="ai-size-select" [value]="aiModel()" (change)="aiModel.set($any($event.target).value)"
                   aria-label="Image model" [disabled]="aiGenerating() || aiProviders().length === 0">
@@ -353,8 +400,14 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
                   <option value="1024x1536">Portrait · 1024×1536 ({{ sizeCost('1024x1536') }})</option>
                 </select>
                 <button class="btn-save" type="button" (click)="generateImage()"
+                  style="display: flex; align-items: center; justify-content: center; gap: 8px;"
                   [disabled]="aiGenerating() || aiPrompt().trim().length < 3 || aiProviders().length === 0">
-                  @if (aiGenerating()) { Generating… } @else { Generate Image }
+                  @if (aiGenerating()) {
+                    <div class="spinner" aria-hidden="true"></div>
+                    Generating…
+                  } @else {
+                    Generate Image
+                  }
                 </button>
               </div>
               @if (aiProviders().length === 0) {
@@ -365,15 +418,35 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
 
             @if (aiResult(); as result) {
               <div class="ai-result-card">
-                <img class="ai-result-img" [src]="result.image" alt="AI-generated image for prompt: {{ aiPrompt() }}" />
+                <!-- If multiple variations exist, show a premium sub-gallery -->
+                @if (aiImagesList().length > 1) {
+                  <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+                    @for (imgUrl of aiImagesList(); track imgUrl; let idx = $index) {
+                      <button class="ftab" [class.active]="activeVariationIndex() === idx" (click)="activeVariationIndex.set(idx)" style="display: flex; align-items: center; gap: 6px; padding: 6px 10px;">
+                        <img [src]="imgUrl" style="width: 20px; height: 20px; border-radius: 4px; object-fit: cover;" alt="Var preview" />
+                        Variation {{ idx + 1 }}
+                      </button>
+                    }
+                  </div>
+                }
+
+                <div style="position: relative;">
+                  <img class="ai-result-img" [src]="aiImagesList()[activeVariationIndex()] || result.image" alt="AI-generated image" />
+                  @if (aiImagesList().length > 1) {
+                    <div style="position: absolute; bottom: 8px; right: 8px; background: rgba(0, 0, 0, 0.75); color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">
+                      Variation {{ activeVariationIndex() + 1 }} of {{ aiImagesList().length }}
+                    </div>
+                  }
+                </div>
+
                 @if (result.revisedPrompt) {
                   <p class="ai-revised">DALL·E interpreted your prompt as: “{{ result.revisedPrompt }}”</p>
                 }
                 <div class="ai-result-actions">
                   @if (aiSaved()) {
-                    <span class="ai-saved-ok" role="status">✓ Saved to asset library</span>
+                    <span class="ai-saved-ok" role="status">✓ Saved Var {{ activeVariationIndex() + 1 }} to asset library</span>
                   } @else {
-                    <button class="btn-save" type="button" (click)="saveAiImageToAssets()" [disabled]="aiEditing()">Save to Assets</button>
+                    <button class="btn-save" type="button" (click)="saveAiImageToAssets()" [disabled]="aiEditing()">Save Var {{ activeVariationIndex() + 1 }} to Assets</button>
                   }
                   <button class="btn-ghost" type="button" (click)="generateImage()"
                     [disabled]="aiGenerating() || aiEditing()"
@@ -396,8 +469,14 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
                       [disabled]="aiEditing()"
                       aria-label="Edit instruction for the generated image" />
                     <button class="btn-save" type="button" (click)="editImage()"
+                      style="display: flex; align-items: center; justify-content: center; gap: 8px;"
                       [disabled]="aiEditing() || aiGenerating() || aiEditInstruction().trim().length < 3">
-                      @if (aiEditing()) { Editing… } @else { Apply Edit }
+                      @if (aiEditing()) {
+                        <div class="spinner" aria-hidden="true"></div>
+                        Editing…
+                      } @else {
+                        Apply Edit
+                      }
                     </button>
                   </div>
                 }
@@ -426,8 +505,14 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
                     <option [value]="10">10 seconds (~$0.50)</option>
                   </select>
                   <button class="btn-save" type="button" (click)="generateVideo()"
+                    style="display: flex; align-items: center; justify-content: center; gap: 8px;"
                     [disabled]="videoBusy() || videoPrompt().trim().length < 3">
-                    @if (videoBusy()) { Generating… } @else { Generate Video }
+                    @if (videoBusy()) {
+                      <div class="spinner" aria-hidden="true"></div>
+                      Generating…
+                    } @else {
+                      Generate Video
+                    }
                   </button>
                 </div>
                 @if (videoError()) { <div class="ai-error" role="alert">{{ videoError() }}</div> }
@@ -450,8 +535,15 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
                     @if (videoSaved()) {
                       <span class="ai-saved-ok" role="status">✓ Saved to asset library</span>
                     } @else {
-                      <button class="btn-save" type="button" (click)="saveAiVideoToAssets()" [disabled]="videoSaving()">
-                        @if (videoSaving()) { Saving… } @else { Save to Assets }
+                      <button class="btn-save" type="button" (click)="saveAiVideoToAssets()"
+                        style="display: flex; align-items: center; justify-content: center; gap: 8px;"
+                        [disabled]="videoSaving()">
+                        @if (videoSaving()) {
+                          <div class="spinner" aria-hidden="true"></div>
+                          Saving…
+                        } @else {
+                          Save to Assets
+                        }
                       </button>
                     }
                     <button class="btn-ghost" type="button" (click)="discardAiVideo()" [disabled]="videoSaving()">Discard</button>
@@ -795,6 +887,21 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
     .spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .empty-hint { font-size: 13px; color: var(--color-text-muted); padding: 16px 0; }
+
+    @media (max-width: 768px) {
+      .section-title-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .tab-nav { overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; margin: 0 -16px; padding: 0 16px; }
+      .tab-btn { flex-shrink: 0; }
+      .kanban-board { grid-template-columns: 1fr; }
+      .gate-wrap { grid-template-columns: 1fr; gap: 16px; }
+      .asset-form-grid { grid-template-columns: 1fr; }
+      .ai-controls { flex-direction: column; align-items: stretch; gap: 8px; }
+      .ai-controls select, .ai-controls button { width: 100% !important; margin: 0; }
+      .ai-edit-row { flex-direction: column; align-items: stretch; gap: 8px; }
+      .ai-edit-input { width: 100% !important; }
+      .prompt-templates-row { flex-direction: column; align-items: stretch; gap: 8px; }
+      .prompt-templates-row > * { width: 100% !important; margin: 0; }
+    }
   `]
 })
 export class DesignModule implements OnInit {
@@ -847,9 +954,18 @@ export class DesignModule implements OnInit {
   protected aiModel      = signal<AiImageModel>('openai');
   protected aiGenerating = signal(false);
   protected aiError      = signal<string | null>(null);
-  protected aiResult     = signal<AiImageResult | null>(null);
+  protected aiResult     = signal<any | null>(null);
   protected aiSaved      = signal(false);
   protected aiUsage      = signal<AiUsage | null>(null);
+
+  // Advanced AI features signals
+  protected promptTemplates      = signal<any[]>([]);
+  protected selectedStylePreset  = signal<string>('none');
+  protected aiCount              = signal<number>(1);
+  protected activeVariationIndex = signal<number>(0);
+  protected aiImagesList         = signal<string[]>([]);
+  protected selectedTemplateId   = signal<string>('');
+  protected savingTemplate       = signal(false);
 
   /** Which image providers have server-side credentials (from GET /integrations). */
   private configuredProviders = signal<Set<string>>(new Set(['OPENAI']));
@@ -1040,13 +1156,25 @@ export class DesignModule implements OnInit {
     this.aiError.set(null);
     this.aiSaved.set(false);
     this.aiGenerating.set(true);
+
+    const preset = this.selectedStylePreset();
+    const modifier = this.getStyleModifier(preset);
+    const fullPrompt = this.aiPrompt().trim() + modifier;
+
     this.projectService.generateAiImage(this.projectId, {
-      prompt: this.aiPrompt().trim(),
+      prompt: fullPrompt,
       size: this.aiSize(),
       model: this.aiModel(),
+      count: this.aiCount(),
     }).subscribe({
       next: (res) => {
         this.aiResult.set(res);
+        if (res.images && res.images.length > 0) {
+          this.aiImagesList.set(res.images);
+        } else {
+          this.aiImagesList.set([res.image]);
+        }
+        this.activeVariationIndex.set(0);
         this.aiGenerating.set(false);
         this.loadAiUsage();
       },
@@ -1061,11 +1189,15 @@ export class DesignModule implements OnInit {
   protected saveAiImageToAssets(): void {
     const result = this.aiResult();
     if (!result) return;
+    const images = this.aiImagesList();
+    const idx = this.activeVariationIndex();
+    const imageUrl = images[idx] || result.image;
+
     this.projectService.createDesignAsset(this.projectId, {
-      name: `AI · ${this.aiPrompt().trim().slice(0, 60)}`,
+      name: `AI · ${this.aiPrompt().trim().slice(0, 50)} · Var ${idx + 1}`,
       type: 'IMAGE' as AssetType,
-      url: result.image,
-      notes: `AI-generated. Prompt: ${this.aiPrompt().trim().slice(0, 300)}`,
+      url: imageUrl,
+      notes: `AI-generated. Style: ${this.selectedStylePreset()}. Prompt: ${this.aiPrompt().trim().slice(0, 300)}`,
       version: 1,
     }).subscribe((a) => {
       this.assets.update(list => [...list, { id: a.id, name: a.name, type: a.type as AssetType, url: a.url, thumbnailUrl: '', version: a.version, notes: a.notes ?? '', approvedAt: a.approvedAt ?? null }]);
@@ -1079,16 +1211,22 @@ export class DesignModule implements OnInit {
   protected editImage(): void {
     const result = this.aiResult();
     if (!result) return;
+    const images = this.aiImagesList();
+    const idx = this.activeVariationIndex();
+    const imageUrl = images[idx] || result.image;
+
     this.aiError.set(null);
     this.aiSaved.set(false);
     this.aiEditing.set(true);
     this.projectService.editAiImage(this.projectId, {
-      image: result.image,
+      image: imageUrl,
       instruction: this.aiEditInstruction().trim(),
       size: this.aiSize(),
     }).subscribe({
       next: (res) => {
         this.aiResult.set(res);
+        this.aiImagesList.set([res.image]);
+        this.activeVariationIndex.set(0);
         this.aiEditInstruction.set('');
         this.aiEditing.set(false);
         this.loadAiUsage();
@@ -1104,6 +1242,8 @@ export class DesignModule implements OnInit {
   protected discardAiResult(): void {
     if (this.hasUnsavedAiImage() && !confirm('This image has not been saved to Assets. Discard it anyway?')) return;
     this.aiResult.set(null);
+    this.aiImagesList.set([]);
+    this.activeVariationIndex.set(0);
     this.aiSaved.set(false);
     this.aiEditInstruction.set('');
     this.aiError.set(null);
@@ -1198,6 +1338,7 @@ export class DesignModule implements OnInit {
     }
     this.loadAiUsage();
     this.loadIntegrations();
+    this.loadPromptTemplates();
     this.destroyRef.onDestroy(() => {
       if (this.videoPollTimer) clearTimeout(this.videoPollTimer);
       if (this.activeVideoBlobUrl) URL.revokeObjectURL(this.activeVideoBlobUrl);
@@ -1339,5 +1480,71 @@ export class DesignModule implements OnInit {
         this.gateSubmitting.set(false);
       },
     });
+  }
+
+  // ── Prompt Templates & Style Presets Helpers ────────────────────────────────
+
+  protected loadPromptTemplates(): void {
+    this.projectService.getPromptTemplates(this.projectId).subscribe({
+      next: (res) => this.promptTemplates.set(res)
+    });
+  }
+
+  protected onTemplateChange(templateId: string): void {
+    this.selectedTemplateId.set(templateId);
+    if (!templateId) return;
+    const template = this.promptTemplates().find(t => t.id === templateId);
+    if (template) {
+      this.aiPrompt.set(template.prompt);
+    }
+  }
+
+  protected saveCurrentAsTemplate(): void {
+    const prompt = this.aiPrompt().trim();
+    if (!prompt) return;
+    const name = window.prompt('Enter a name for this prompt template:');
+    if (!name) return;
+
+    this.savingTemplate.set(true);
+    this.projectService.createPromptTemplate(this.projectId, { name, prompt }).subscribe({
+      next: (template) => {
+        this.promptTemplates.update(list => [...list, template]);
+        this.selectedTemplateId.set(template.id);
+        this.savingTemplate.set(false);
+      },
+      error: () => this.savingTemplate.set(false)
+    });
+  }
+
+  protected deleteTemplate(templateId: string, event: Event): void {
+    event.stopPropagation();
+    event.preventDefault();
+    if (confirm('Are you sure you want to delete this prompt template?')) {
+      this.projectService.deletePromptTemplate(this.projectId, templateId).subscribe(() => {
+        this.promptTemplates.update(list => list.filter(t => t.id !== templateId));
+        if (this.selectedTemplateId() === templateId) {
+          this.selectedTemplateId.set('');
+        }
+      });
+    }
+  }
+
+  protected getStyleModifier(preset: string): string {
+    switch (preset) {
+      case 'photorealistic':
+        return ', photorealistic, 8k resolution, highly detailed, dramatic lighting, commercial product photo';
+      case 'flat':
+        return ', flat vector illustration, minimalist style, clean colors, corporate graphic style';
+      case 'minimal':
+        return ', minimalist style, clean, simple, light background, negative space';
+      case 'corporate':
+        return ', clean corporate style, professional, modern branding, high-end design';
+      case 'lifestyle':
+        return ', lifestyle shot, authentic, warm lighting, natural look, high quality photography';
+      case 'product':
+        return ', professional product studio shot, clean background, reflection, commercial key lighting';
+      default:
+        return '';
+    }
   }
 }

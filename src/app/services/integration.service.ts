@@ -8,15 +8,18 @@ export type OAuthProviderSlug = 'google' | 'meta' | 'tiktok';
 export class IntegrationService {
   private api = inject(ApiService);
 
-  getIntegrations() {
-    return this.api.get<{ integrations: IntegrationInfo[] }>('/integrations');
+  getIntegrations(projectId?: string) {
+    const url = projectId ? `/integrations?projectId=${projectId}` : '/integrations';
+    return this.api.get<{ integrations: IntegrationInfo[] }>(url);
   }
 
-  getAuthUrl(provider: OAuthProviderSlug) {
-    return this.api.get<{ url: string }>(`/integrations/${provider}/auth-url`);
+  getAuthUrl(provider: OAuthProviderSlug, projectId?: string) {
+    const url = projectId ? `/integrations/${provider}/auth-url?projectId=${projectId}` : `/integrations/${provider}/auth-url`;
+    return this.api.get<{ url: string }>(url);
   }
 
-  disconnect(provider: OAuthProviderSlug) {
-    return this.api.post<{ disconnected: string[] }>(`/integrations/${provider}/disconnect`, {});
+  disconnect(provider: OAuthProviderSlug, projectId?: string) {
+    const url = projectId ? `/integrations/${provider}/disconnect?projectId=${projectId}` : `/integrations/${provider}/disconnect`;
+    return this.api.post<{ disconnected: string[] }>(url, {});
   }
 }

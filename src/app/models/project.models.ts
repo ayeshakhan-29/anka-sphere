@@ -102,6 +102,8 @@ export interface ContentPage {
   status: PageStatus;
   wordCount?: number;
   sortOrder: number;
+  pillarId?: string;
+  pillar?: any;
 }
 
 export interface WrittenContent {
@@ -647,6 +649,8 @@ export interface EmailCampaign {
   cta?: string;
   sendDate?: string;
   status: 'DRAFT' | 'SCHEDULED' | 'SENT' | 'ARCHIVED';
+  pillarId?: string;
+  pillar?: ContentPillar;
   createdAt: string;
 }
 
@@ -722,5 +726,57 @@ export interface KeywordRankLog {
   previousPos?: number;
   clusterName?: string;
   checkedAt: string;
+}
+
+export interface ContentPillar {
+  id: string;
+  projectId: string;
+  name: string;
+  color: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PromptTemplate {
+  id: string;
+  projectId: string;
+  name: string;
+  prompt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MonthlyContentReport {
+  projectName: string;
+  clientName: string;
+  period: string;
+  stats: {
+    totalProduced: number;
+    blogsProduced: number;
+    emailsProduced: number;
+    socialsProduced: number;
+  };
+  topArticles: Array<{
+    title: string;
+    slug: string;
+    views: number;
+    engagementTime: string;
+  }>;
+  emailMetrics: {
+    campaignsSent: number;
+    audienceReached: number;
+    openRate: string;
+    clickRate: string;
+  };
+  trafficContribution: {
+    contentSessions: number;
+    totalSessions: number;
+    percentage: string;
+  };
+  pillars: Array<{
+    name: string;
+    color: string;
+    count: number;
+  }>;
 }
 

@@ -360,82 +360,111 @@ function splitKw(raw?: string): string[] {
         <!-- ── Tab: Backlink Tracker ── -->
         @if (activeTab() === 'backlinks') {
           <section aria-label="Backlink Tracker" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 16px; display: flex; flex-direction: column; gap: 12px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
               <div>
                 <h3 style="font-size: 15px; font-weight: 600; color: var(--color-text); margin: 0;">Backlink Tracker</h3>
                 <p style="font-size: 12px; color: var(--color-text-muted); margin: 2px 0 0;">Log & track acquired backlinks, anchor text, domain authority (DA/DR), and link status.</p>
               </div>
-              <ui-badge variant="success">3 Live Backlinks</ui-badge>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <select class="search-input" style="width: auto;" [value]="selectedBacklinkProjectId()" (change)="onBacklinkProjectChange($any($event.target).value)">
+                  <option value="">— Select project —</option>
+                  @for (p of projects(); track p.id) {
+                    <option [value]="p.id">{{ p.name }}</option>
+                  }
+                </select>
+                <ui-badge variant="success">{{ backlinks().length }} Live Backlinks</ui-badge>
+              </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 180px 140px 1fr 90px 100px; gap: 10px; padding: 0 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--color-text-muted);">
-              <span>Source Domain</span><span>Target Page</span><span>Anchor Text</span><span>DA Score</span><span>Status</span>
-            </div>
+            <!-- Form to add new backlink -->
+            @if (selectedBacklinkProjectId()) {
+              <form (submit)="addBacklink(); $event.preventDefault()" style="display: grid; grid-template-columns: repeat(4, 1fr) 100px; gap: 10px; align-items: center; padding: 10px 14px; background: var(--color-surface-raised); border: 1.5px dashed var(--color-border); border-radius: 8px;">
+                <input type="text" placeholder="Source Domain (e.g. techcrunch.com)" [value]="newBacklinkSource()" (input)="newBacklinkSource.set($any($event.target).value)" style="height: 30px; padding: 0 8px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-surface); color: var(--color-text); font-size: 12.5px;" required />
+                <input type="text" placeholder="Target Page (e.g. /services)" [value]="newBacklinkTarget()" (input)="newBacklinkTarget.set($any($event.target).value)" style="height: 30px; padding: 0 8px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-surface); color: var(--color-text); font-size: 12.5px;" required />
+                <input type="text" placeholder="Anchor Text (e.g. best agency)" [value]="newBacklinkAnchor()" (input)="newBacklinkAnchor.set($any($event.target).value)" style="height: 30px; padding: 0 8px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-surface); color: var(--color-text); font-size: 12.5px;" required />
+                <input type="number" placeholder="DA Score" [value]="newBacklinkDa()" (input)="newBacklinkDa.set($any($event.target).valueAsNumber)" style="height: 30px; padding: 0 8px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-surface); color: var(--color-text); font-size: 12.5px;" min="1" max="100" required />
+                <button type="submit" class="btn-primary" style="height: 30px; font-size: 11.5px; font-weight: 600;">Add</button>
+              </form>
+            }
 
-            <div style="display: flex; flex-direction: column; gap: 6px;">
-              <div style="display: grid; grid-template-columns: 180px 140px 1fr 90px 100px; gap: 10px; align-items: center; padding: 10px 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px;">
-                <span style="font-size: 13px; font-weight: 600; color: #10B981;">techcrunch.com</span>
-                <span style="font-size: 12px; color: var(--color-text-muted); font-family: monospace;">/services</span>
-                <span style="font-size: 12.5px;">"top digital growth platform"</span>
-                <span style="font-size: 13px; font-weight: 700;">88</span>
-                <ui-badge variant="success">Live</ui-badge>
+            @if (backlinksLoading()) {
+              <div class="loading-state" role="status"><div class="spinner" aria-hidden="true"></div>Loading backlinks…</div>
+            } @else {
+              <div style="display: grid; grid-template-columns: 180px 140px 1fr 90px 100px 60px; gap: 10px; padding: 0 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--color-text-muted);">
+                <span>Source Domain</span><span>Target Page</span><span>Anchor Text</span><span>DA Score</span><span>Status</span><span></span>
               </div>
-              <div style="display: grid; grid-template-columns: 180px 140px 1fr 90px 100px; gap: 10px; align-items: center; padding: 10px 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px;">
-                <span style="font-size: 13px; font-weight: 600; color: #10B981;">searchengineland.com</span>
-                <span style="font-size: 12px; color: var(--color-text-muted); font-family: monospace;">/blog/seo-guide</span>
-                <span style="font-size: 12.5px;">"SEO best practices"</span>
-                <span style="font-size: 13px; font-weight: 700;">76</span>
-                <ui-badge variant="success">Live</ui-badge>
+
+              <div style="display: flex; flex-direction: column; gap: 6px;">
+                @for (link of backlinks(); track link.id) {
+                  <div style="display: grid; grid-template-columns: 180px 140px 1fr 90px 100px 60px; gap: 10px; align-items: center; padding: 10px 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px;">
+                    <span style="font-size: 13px; font-weight: 600; color: #10B981;">{{ link.sourceDomain }}</span>
+                    <span style="font-size: 12px; color: var(--color-text-muted); font-family: monospace;">{{ link.targetPage }}</span>
+                    <span style="font-size: 12.5px;">"{{ link.anchorText }}"</span>
+                    <span style="font-size: 13px; font-weight: 700;">{{ link.daScore }}</span>
+                    <ui-badge variant="success">{{ link.status }}</ui-badge>
+                    <button class="btn-mini danger" (click)="deleteBacklink(link)" style="height: 26px; font-size: 11px;">Delete</button>
+                  </div>
+                } @empty {
+                  <div class="empty-state">No backlinks recorded yet. Select a project and add link building actions above.</div>
+                }
               </div>
-              <div style="display: grid; grid-template-columns: 180px 140px 1fr 90px 100px; gap: 10px; align-items: center; padding: 10px 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px;">
-                <span style="font-size: 13px; font-weight: 600; color: var(--color-text);">medium.com</span>
-                <span style="font-size: 12px; color: var(--color-text-muted); font-family: monospace;">/about</span>
-                <span style="font-size: 12.5px;">"marketing agency"</span>
-                <span style="font-size: 13px; font-weight: 700;">64</span>
-                <ui-badge variant="warning">Pending</ui-badge>
-              </div>
-            </div>
+            }
           </section>
         }
 
         <!-- ── Tab: Rank Tracker ── -->
         @if (activeTab() === 'rank_tracker') {
           <section aria-label="Keyword Rank Tracker" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 16px; display: flex; flex-direction: column; gap: 12px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
               <div>
                 <h3 style="font-size: 15px; font-weight: 600; color: var(--color-text); margin: 0;">Keyword Rank Tracker</h3>
                 <p style="font-size: 12px; color: var(--color-text-muted); margin: 2px 0 0;">Track weekly keyword ranking positions, movement (up/down), and cluster breakdown.</p>
               </div>
-              <ui-badge variant="success">Avg Position #4.2</ui-badge>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <select class="search-input" style="width: auto;" [value]="selectedRankProjectId()" (change)="onRankProjectChange($any($event.target).value)">
+                  <option value="">— Select project —</option>
+                  @for (p of projects(); track p.id) {
+                    <option [value]="p.id">{{ p.name }}</option>
+                  }
+                </select>
+                <ui-badge variant="success">Avg Position #{{ getAvgRank() }}</ui-badge>
+              </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 160px 100px 100px 110px; gap: 10px; padding: 0 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--color-text-muted);">
-              <span>Keyword</span><span>Topic Cluster</span><span>Position</span><span>Previous</span><span>Movement</span>
-            </div>
+            <!-- Form to add rank log -->
+            @if (selectedRankProjectId()) {
+              <form (submit)="addRankLog(); $event.preventDefault()" style="display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 100px; gap: 10px; align-items: center; padding: 10px 14px; background: var(--color-surface-raised); border: 1.5px dashed var(--color-border); border-radius: 8px;">
+                <input type="text" placeholder="Keyword (e.g. digital dashboard)" [value]="newRankKeyword()" (input)="newRankKeyword.set($any($event.target).value)" style="height: 30px; padding: 0 8px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-surface); color: var(--color-text); font-size: 12.5px;" required />
+                <input type="text" placeholder="Cluster Name" [value]="newRankCluster()" (input)="newRankCluster.set($any($event.target).value)" style="height: 30px; padding: 0 8px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-surface); color: var(--color-text); font-size: 12.5px;" required />
+                <input type="number" placeholder="Position" [value]="newRankPosition()" (input)="newRankPosition.set($any($event.target).valueAsNumber)" style="height: 30px; padding: 0 8px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-surface); color: var(--color-text); font-size: 12.5px;" min="1" required />
+                <input type="number" placeholder="Prev Pos" [value]="newRankPrevious()" (input)="newRankPrevious.set($any($event.target).valueAsNumber)" style="height: 30px; padding: 0 8px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-surface); color: var(--color-text); font-size: 12.5px;" min="1" required />
+                <button type="submit" class="btn-primary" style="height: 30px; font-size: 11.5px; font-weight: 600;">Log Rank</button>
+              </form>
+            }
 
-            <div style="display: flex; flex-direction: column; gap: 6px;">
-              <div style="display: grid; grid-template-columns: 1fr 160px 100px 100px 110px; gap: 10px; align-items: center; padding: 10px 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px;">
-                <span style="font-size: 13px; font-weight: 600;">"digital marketing dashboard"</span>
-                <span style="font-size: 12px; color: var(--color-text-muted);">Core Services</span>
-                <span style="font-size: 14px; font-weight: 700; color: #10B981;">#2</span>
-                <span style="font-size: 13px; color: var(--color-text-muted);">#5</span>
-                <span style="font-size: 12px; font-weight: 700; color: #059669;">▲ +3 Pos</span>
+            @if (rankLoading()) {
+              <div class="loading-state" role="status"><div class="spinner" aria-hidden="true"></div>Loading ranks…</div>
+            } @else {
+              <div style="display: grid; grid-template-columns: 1fr 160px 100px 100px 110px; gap: 10px; padding: 0 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--color-text-muted);">
+                <span>Keyword</span><span>Topic Cluster</span><span>Position</span><span>Previous</span><span>Movement</span>
               </div>
-              <div style="display: grid; grid-template-columns: 1fr 160px 100px 100px 110px; gap: 10px; align-items: center; padding: 10px 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px;">
-                <span style="font-size: 13px; font-weight: 600;">"growth agency operations"</span>
-                <span style="font-size: 12px; color: var(--color-text-muted);">Agency Growth</span>
-                <span style="font-size: 14px; font-weight: 700; color: #10B981;">#4</span>
-                <span style="font-size: 13px; color: var(--color-text-muted);">#4</span>
-                <span style="font-size: 12px; font-weight: 600; color: var(--color-text-muted);">= No Change</span>
+
+              <div style="display: flex; flex-direction: column; gap: 6px;">
+                @for (log of rankLogs(); track log.id) {
+                  <div style="display: grid; grid-template-columns: 1fr 160px 100px 100px 110px; gap: 10px; align-items: center; padding: 10px 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px;">
+                    <span style="font-size: 13px; font-weight: 600;">"{{ log.keyword }}"</span>
+                    <span style="font-size: 12px; color: var(--color-text-muted);">{{ log.clusterName }}</span>
+                    <span style="font-size: 14px; font-weight: 700; color: #10B981;">#{{ log.position }}</span>
+                    <span style="font-size: 13px; color: var(--color-text-muted);">#{{ log.previousPos }}</span>
+                    <span style="font-size: 12px; font-weight: 700;" [style.color]="getMovementColor(log.position, log.previousPos)">
+                      {{ getMovementLabel(log.position, log.previousPos) }}
+                    </span>
+                  </div>
+                } @empty {
+                  <div class="empty-state">No keyword ranks logged yet. Select a project and log rank checks above.</div>
+                }
               </div>
-              <div style="display: grid; grid-template-columns: 1fr 160px 100px 100px 110px; gap: 10px; align-items: center; padding: 10px 14px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px;">
-                <span style="font-size: 13px; font-weight: 600;">"full funnel marketing platform"</span>
-                <span style="font-size: 12px; color: var(--color-text-muted);">Full Funnel</span>
-                <span style="font-size: 14px; font-weight: 700; color: #10B981;">#6</span>
-                <span style="font-size: 13px; color: var(--color-text-muted);">#8</span>
-                <span style="font-size: 12px; font-weight: 700; color: #059669;">▲ +2 Pos</span>
-              </div>
-            </div>
+            }
           </section>
         }
 
@@ -624,12 +653,30 @@ export class SeoDept implements OnInit {
   protected allPages    = signal<OnPageRow[]>([]);
   protected allTasks    = signal<SeoTask[]>([]);
 
+  // Real backlinks signals
+  protected selectedBacklinkProjectId = signal<string>('');
+  protected backlinks = signal<any[]>([]);
+  protected backlinksLoading = signal(false);
+  protected newBacklinkSource = signal('');
+  protected newBacklinkTarget = signal('/services');
+  protected newBacklinkAnchor = signal('');
+  protected newBacklinkDa = signal(45);
+
+  // Real rank tracker signals
+  protected selectedRankProjectId = signal<string>('');
+  protected rankLogs = signal<any[]>([]);
+  protected rankLoading = signal(false);
+  protected newRankKeyword = signal('');
+  protected newRankPosition = signal(3);
+  protected newRankPrevious = signal(5);
+  protected newRankCluster = signal('Core Services');
+
   readonly tabs = [
     { id: 'projects'     as TabId, label: 'Projects',        count: computed(() => this.projects().length) },
     { id: 'keywords'     as TabId, label: 'Keyword Board',   count: computed(() => this.allKeywords().length) },
     { id: 'onpage'       as TabId, label: 'On-Page SEO',     count: computed(() => this.allPages().length) },
-    { id: 'backlinks'    as TabId, label: 'Backlinks',       count: computed(() => 3) },
-    { id: 'rank_tracker' as TabId, label: 'Rank Tracker',    count: computed(() => 4) },
+    { id: 'backlinks'    as TabId, label: 'Backlinks',       count: computed(() => this.backlinks().length) },
+    { id: 'rank_tracker' as TabId, label: 'Rank Tracker',    count: computed(() => this.rankLogs().length) },
     { id: 'tasks'        as TabId, label: 'SEO Tasks',       count: computed(() => this.allTasks().length) },
   ];
 
@@ -799,6 +846,12 @@ export class SeoDept implements OnInit {
         this.allPages.set(pages);
         this.allTasks.set(tasks);
         this.loading.set(false);
+
+        if (seoProjects.length > 0) {
+          const firstId = seoProjects[0].id;
+          this.onBacklinkProjectChange(firstId);
+          this.onRankProjectChange(firstId);
+        }
       },
       error: () => this.loading.set(false),
     });
@@ -870,5 +923,98 @@ export class SeoDept implements OnInit {
     if (s === 'IN_PROGRESS') return 'In Progress';
     if (s === 'IN_REVIEW') return 'In Review';
     return s.charAt(0) + s.slice(1).toLowerCase();
+  }
+
+  protected onBacklinkProjectChange(projectId: string) {
+    this.selectedBacklinkProjectId.set(projectId);
+    if (!projectId) {
+      this.backlinks.set([]);
+      return;
+    }
+    this.backlinksLoading.set(true);
+    this.projectService.getBacklinks(projectId).subscribe({
+      next: (res: any) => {
+        this.backlinks.set(res);
+        this.backlinksLoading.set(false);
+      },
+      error: () => this.backlinksLoading.set(false),
+    });
+  }
+
+  protected addBacklink() {
+    const id = this.selectedBacklinkProjectId();
+    if (!id || !this.newBacklinkSource().trim()) return;
+    this.projectService.createBacklink(id, {
+      sourceDomain: this.newBacklinkSource().trim(),
+      targetPage: this.newBacklinkTarget().trim(),
+      anchorText: this.newBacklinkAnchor().trim(),
+      daScore: this.newBacklinkDa(),
+      status: 'LIVE'
+    }).subscribe({
+      next: (link) => {
+        this.backlinks.update(list => [link, ...list]);
+        this.newBacklinkSource.set('');
+        this.newBacklinkAnchor.set('');
+      }
+    });
+  }
+
+  protected deleteBacklink(link: any) {
+    this.projectService.deleteBacklink(this.selectedBacklinkProjectId(), link.id).subscribe({
+      next: () => {
+        this.backlinks.update(list => list.filter(x => x.id !== link.id));
+      }
+    });
+  }
+
+  protected onRankProjectChange(projectId: string) {
+    this.selectedRankProjectId.set(projectId);
+    if (!projectId) {
+      this.rankLogs.set([]);
+      return;
+    }
+    this.rankLoading.set(true);
+    this.projectService.getKeywordRankLogs(projectId).subscribe({
+      next: (res: any) => {
+        this.rankLogs.set(res);
+        this.rankLoading.set(false);
+      },
+      error: () => this.rankLoading.set(false),
+    });
+  }
+
+  protected addRankLog() {
+    const id = this.selectedRankProjectId();
+    if (!id || !this.newRankKeyword().trim()) return;
+    this.projectService.createKeywordRankLog(id, {
+      keyword: this.newRankKeyword().trim(),
+      clusterName: this.newRankCluster().trim(),
+      position: this.newRankPosition(),
+      previousPos: this.newRankPrevious()
+    }).subscribe({
+      next: (log) => {
+        this.rankLogs.update(list => [log, ...list]);
+        this.newRankKeyword.set('');
+      }
+    });
+  }
+
+  protected getAvgRank(): string {
+    const logs = this.rankLogs();
+    if (logs.length === 0) return '—';
+    const sum = logs.reduce((acc, log) => acc + log.position, 0);
+    return (sum / logs.length).toFixed(1);
+  }
+
+  protected getMovementColor(pos: number, prev: number): string {
+    if (pos < prev) return '#059669'; // Green (Up)
+    if (pos > prev) return '#DC2626'; // Red (Down)
+    return 'var(--color-text-muted)'; // Grey (No Change)
+  }
+
+  protected getMovementLabel(pos: number, prev: number): string {
+    if (pos < prev) return `▲ +${prev - pos} Pos`;
+    if (pos > prev) return `▼ -${pos - prev} Pos`;
+    return '= No Change';
   }
 }

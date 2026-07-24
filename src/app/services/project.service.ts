@@ -392,8 +392,8 @@ export class ProjectService {
   verifyEmailDeliveryDns(projectId: string) {
     return this.api.post<EmailDeliveryProfile>(`/projects/${projectId}/email-delivery/verify-dns`, {});
   }
-  generateAiImage(projectId: string, data: { prompt: string; size?: string; model?: string; saveToAssets?: boolean; assetName?: string }) {
-    return this.api.post<AiImageResult>(`/projects/${projectId}/design/ai-images`, data);
+  generateAiImage(projectId: string, data: { prompt: string; size?: string; model?: string; saveToAssets?: boolean; assetName?: string; count?: number }) {
+    return this.api.post<any>(`/projects/${projectId}/design/ai-images`, data);
   }
 
   editAiImage(projectId: string, data: { image: string; instruction: string; size?: string }) {
@@ -529,6 +529,28 @@ export class ProjectService {
     return this.api.post<{ success: boolean; status: string }>(`/projects/${projectId}/google-credentials`, data);
   }
 
+  // ── Per-project Social Credentials (Meta & TikTok) ─────────────────────────
+
+  getProjectSocialCredentials(projectId: string) {
+    return this.api.get<{
+      hasMetaAppId: boolean;
+      hasMetaAppSecret: boolean;
+      maskedMetaAppId: string | null;
+      hasTiktokClientKey: boolean;
+      hasTiktokClientSecret: boolean;
+      maskedTiktokClientKey: string | null;
+    }>(`/projects/${projectId}/social-credentials`);
+  }
+
+  saveProjectSocialCredentials(projectId: string, data: {
+    metaAppId?: string;
+    metaAppSecret?: string;
+    tiktokClientKey?: string;
+    tiktokClientSecret?: string;
+  }) {
+    return this.api.post<{ success: boolean }>(`/projects/${projectId}/social-credentials`, data);
+  }
+
   // ── Email Campaigns ───────────────────────────────────────────────────────
 
   getEmailCampaigns(projectId: string) {
@@ -635,6 +657,48 @@ export class ProjectService {
 
   createKeywordRankLog(projectId: string, data: Partial<KeywordRankLog>) {
     return this.api.post<KeywordRankLog>(`/projects/${projectId}/seo/rank-tracker`, data);
+  }
+
+  // ── Content Pillars ────────────────────────────────────────────────────────
+
+  getPillars(projectId: string) {
+    return this.api.get<any[]>(`/projects/${projectId}/marketing/pillars`);
+  }
+
+  createPillar(projectId: string, data: { name: string; color: string }) {
+    return this.api.post<any>(`/projects/${projectId}/marketing/pillars`, data);
+  }
+
+  deletePillar(projectId: string, pillarId: string) {
+    return this.api.delete<void>(`/projects/${projectId}/marketing/pillars/${pillarId}`);
+  }
+
+  // ── Prompt Templates ───────────────────────────────────────────────────────
+
+  getPromptTemplates(projectId: string) {
+    return this.api.get<any[]>(`/projects/${projectId}/ai/templates`);
+  }
+
+  createPromptTemplate(projectId: string, data: { name: string; prompt: string }) {
+    return this.api.post<any>(`/projects/${projectId}/ai/templates`, data);
+  }
+
+  deletePromptTemplate(projectId: string, templateId: string) {
+    return this.api.delete<void>(`/projects/${projectId}/ai/templates/${templateId}`);
+  }
+
+  updateEmailCampaign(projectId: string, campaignId: string, data: any) {
+    return this.api.patch<any>(`/projects/${projectId}/email-campaigns/${campaignId}`, data);
+  }
+
+  // ── Monthly Content Report ──────────────────────────────────────────────────
+
+  getMonthlyContentReport(projectId: string) {
+    return this.api.get<any>(`/projects/${projectId}/marketing/monthly-report`);
+  }
+
+  getMonthlyContentReportPdf(projectId: string) {
+    return this.api.getBlob(`/projects/${projectId}/marketing/monthly-report/pdf`);
   }
 }
 
