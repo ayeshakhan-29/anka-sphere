@@ -2225,6 +2225,7 @@ export class DevelopmentTab implements OnInit, OnDestroy {
       notes:      v.notes      ?? undefined,
     }).subscribe({
       next: () => {
+        this.projectService.getProject(this.projectId).subscribe(p => this.state.setProject(p));
         this.saving.set(false);
         this.saveSuccess.set(true);
         setTimeout(() => this.saveSuccess.set(false), 2000);

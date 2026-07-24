@@ -1053,6 +1053,7 @@ export class MarketingTab implements OnInit {
     this.saveSuccess.set(false);
     this.projectService.upsertMarketing(this.projectId, this.briefForm.value as any).subscribe({
       next: (mkt) => {
+        this.projectService.getProject(this.projectId).subscribe(p => this.state.setProject(p));
         this.saving.set(false);
         this.saveSuccess.set(true);
         this.tasks.set(mkt.tasks ?? []);

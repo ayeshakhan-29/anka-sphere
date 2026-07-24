@@ -925,7 +925,7 @@ export class Profiling implements OnInit {
   protected competitors = signal<Competitor[]>([]);
   protected milestones = signal<Milestone[]>([]);
 
-  protected profilingComplete = computed(() => this.briefForm.controls.companyName.valid);
+  protected profilingComplete = computed(() => Boolean(this.briefForm.controls.companyName.value || this.state.project()?.profiling?.companyName));
 
   protected tabFilled(id: TabId): boolean {
     if (id === 'brief')   return this.briefForm.valid;
@@ -941,7 +941,18 @@ export class Profiling implements OnInit {
   });
 
   ngOnInit() {
-    const profiling = this.state.project()?.profiling;
+    const current = this.state.project();
+    if (current) {
+      this.populateFromProject(current);
+    }
+    this.projectService.getProject(this.projectId).subscribe(p => {
+      this.state.setProject(p);
+      this.populateFromProject(p);
+    });
+  }
+
+  private populateFromProject(p: any) {
+    const profiling = p?.profiling;
     if (profiling) {
       this.briefForm.patchValue({
         companyName: profiling.companyName ?? '',
@@ -967,20 +978,26 @@ export class Profiling implements OnInit {
         localSeo:          profiling.localSeo ?? '',
         seoNotes:          profiling.seoNotes ?? '',
       });
-      this.personas.set((profiling.personas ?? []).map(p => ({
-        id: p.id, name: p.name ?? '', age: p.age ?? '', role: p.role ?? '',
-        pain: p.painPoints ?? '', goal: p.goals ?? '',
-      })));
-      this.competitors.set((profiling.competitors ?? []).map(c => ({
-        id: c.id, name: c.name ?? '', url: c.url ?? '',
-        strength: c.strengths ?? '', weakness: c.weaknesses ?? '',
+      if (profiling.personas?.length) {
+        this.personas.set(profiling.personas.map((p: any) => ({
+          id: p.id, name: p.name ?? '', age: p.age ?? '', role: p.role ?? '',
+          pain: p.painPoints ?? '', goal: p.goals ?? '',
+        })));
+      }
+      if (profiling.competitors?.length) {
+        this.competitors.set(profiling.competitors.map((c: any) => ({
+          id: c.id, name: c.name ?? '', url: c.url ?? '',
+          strength: c.strengths ?? '', weakness: c.weaknesses ?? '',
+        })));
+      }
+    }
+    const milestones = p?.milestones ?? [];
+    if (milestones.length) {
+      this.milestones.set(milestones.map((m: any) => ({
+        id: m.id, label: m.label, date: m.dueDate?.slice(0, 10) ?? '',
+        done: m.status === 'DONE',
       })));
     }
-    const milestones = this.state.project()?.milestones ?? [];
-    this.milestones.set(milestones.map(m => ({
-      id: m.id, label: m.label, date: m.dueDate?.slice(0, 10) ?? '',
-      done: m.status === 'DONE',
-    })));
   }
 
   private upsertAll() {
@@ -1063,9 +1080,20 @@ export class Profiling implements OnInit {
     this.saving.set(true);
     this.upsertAll().subscribe({
       next: () => {
-        this.saving.set(false);
-        this.saveSuccess.set(true);
-        setTimeout(() => this.saveSuccess.set(false), 2000);
+        this.projectService.getProject(this.projectId).subscribe({
+          next: (p) => {
+            this.state.setProject(p);
+            this.populateFromProject(p);
+            this.saving.set(false);
+            this.saveSuccess.set(true);
+            setTimeout(() => this.saveSuccess.set(false), 2000);
+          },
+          error: () => {
+            this.saving.set(false);
+            this.saveSuccess.set(true);
+            setTimeout(() => this.saveSuccess.set(false), 2000);
+          }
+        });
       },
       error: () => this.saving.set(false),
     });

@@ -861,7 +861,10 @@ export class WrittenContent implements OnInit {
     this.briefForm.markAllAsTouched();
     if (this.briefForm.invalid) return;
     const v = this.briefForm.value;
-    this.projectService.upsertContent(this.projectId, { contentBrief: v.contentBrief ?? undefined, toneOfVoice: v.toneOfVoice ?? undefined }).subscribe();
+    this.projectService.upsertContent(this.projectId, { contentBrief: v.contentBrief ?? undefined, toneOfVoice: v.toneOfVoice ?? undefined })
+      .subscribe(() => {
+        this.projectService.getProject(this.projectId).subscribe(p => this.state.setProject(p));
+      });
   }
 
   protected approveGate() {

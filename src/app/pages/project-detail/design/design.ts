@@ -1452,7 +1452,10 @@ export class DesignModule implements OnInit {
     this.briefForm.markAllAsTouched();
     if (this.briefForm.invalid) return;
     const v = this.briefForm.value;
-    this.projectService.upsertDesign(this.projectId, { brief: v.brief ?? undefined, styleGuide: v.styleGuide ?? undefined, figmaUrl: v.figmaUrl ?? undefined }).subscribe();
+    this.projectService.upsertDesign(this.projectId, { brief: v.brief ?? undefined, styleGuide: v.styleGuide ?? undefined, figmaUrl: v.figmaUrl ?? undefined })
+      .subscribe(() => {
+        this.projectService.getProject(this.projectId).subscribe(p => this.state.setProject(p));
+      });
   }
 
   protected approveGate() {
