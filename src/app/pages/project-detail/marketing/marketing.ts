@@ -80,16 +80,16 @@ const CAT_COLORS: Partial<Record<string, string>> = {
                 <div class="field">
                   <div class="field-link-wrap">
                     <label class="field-label" for="g-dev-token">Google Ads Developer Token</label>
-                    <a href="https://ads.google.com/home/tools/manager-accounts/" target="_blank" rel="noopener" class="field-help-link">Create one →</a>
+                    <a href="https://developers.google.com/google-ads/api/docs/first-call/overview#developer-token" target="_blank" rel="noopener" class="field-help-link">Get Token →</a>
                   </div>
-                  <input id="g-dev-token" class="field-input" type="password" formControlName="developerToken" placeholder="Developer Token" />
+                  <input id="g-dev-token" class="field-input" type="password" formControlName="developerToken" placeholder="e.g. ABc123Xyz789Token" />
                 </div>
                 <div class="field">
                   <div class="field-link-wrap">
                     <label class="field-label" for="g-ads-id">Google Ads Customer Account ID</label>
-                    <a href="https://ads.google.com/aw/overview" target="_blank" rel="noopener" class="field-help-link">Find Account ID →</a>
+                    <a href="https://support.google.com/google-ads/answer/1704344" target="_blank" rel="noopener" class="field-help-link">Find Account ID →</a>
                   </div>
-                  <input id="g-ads-id" class="field-input" type="text" formControlName="googleAdsAccountId" placeholder="e.g. 123-456-7890" />
+                  <input id="g-ads-id" class="field-input" type="text" formControlName="googleAdsAccountId" placeholder="e.g. 123-456-7890 (10-digit Customer ID)" />
                 </div>
                 <div class="field">
                   <div class="field-link-wrap">
