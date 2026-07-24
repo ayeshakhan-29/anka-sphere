@@ -220,6 +220,18 @@ const CAT_COLORS: Partial<Record<string, string>> = {
                 <h3 class="creds-title">Project Social API Credentials (Meta & TikTok)</h3>
                 <p class="creds-sub">Provide project-specific Meta App ID, Meta App Secret, TikTok Client Key, and TikTok Client Secret so each project uses its own developer credentials.</p>
               </div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                @if (hasMetaAppId()) {
+                  <span class="creds-status connected">• Meta App Configured</span>
+                } @else {
+                  <span class="creds-status not-connected">Meta App Missing</span>
+                }
+                @if (hasTiktokClientKey()) {
+                  <span class="creds-status connected">• TikTok App Configured</span>
+                } @else {
+                  <span class="creds-status not-connected">TikTok App Missing</span>
+                }
+              </div>
             </div>
 
             <form [formGroup]="socialForm" (ngSubmit)="saveSocialCredentials()" class="brief-form">
@@ -991,8 +1003,8 @@ export class MarketingTab implements OnInit {
       next: () => {
         this.savingSocialCreds.set(false);
         this.socialCredsSuccess.set(true);
-        this.notifService.toast('Social credentials saved successfully for this project!', 'success');
-        setTimeout(() => this.socialCredsSuccess.set(false), 2500);
+        this.notifService.toast('Social App credentials saved! Next, click "Connect Meta" below to sign in and authorize.', 'success');
+        setTimeout(() => this.socialCredsSuccess.set(false), 3500);
         this.loadProjectSocialCredentials();
       },
       error: (err) => {
