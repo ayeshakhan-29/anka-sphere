@@ -1,10 +1,11 @@
 import { Component, inject, OnInit, OnDestroy, computed, signal } from '@angular/core';
-import { ActivatedRoute, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { distinctUntilChanged, switchMap, tap } from 'rxjs/operators';
 import { Badge } from '../../ui';
 import { ProjectService } from '../../services/project.service';
 import { ProjectStateService } from '../../services/project-state.service';
+import { NotificationService } from '../../services/notification.service';
 
 @Component({
   selector: 'app-project-detail',
@@ -40,10 +41,17 @@ import { ProjectStateService } from '../../services/project-state.service';
               <p class="project-client">{{ state.project()!.clientName }}</p>
             </div>
           </div>
-          <div class="header-right">
+          <div class="header-right" style="display: flex; align-items: center; gap: 10px;">
             <ui-badge [variant]="statusVariant(state.project()!.status)">
               {{ statusLabel(state.project()!.status) }}
             </ui-badge>
+            <button type="button" class="btn-delete-proj" (click)="confirmDelete()" title="Delete Project">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              Delete Project
+            </button>
           </div>
         </div>
 
@@ -288,6 +296,30 @@ import { ProjectStateService } from '../../services/project-state.service';
 
       </div>
     }
+
+    <!-- Delete Confirmation Modal -->
+    @if (showDeleteModal()) {
+      <div class="modal-backdrop" (click)="cancelDelete()" role="dialog" aria-modal="true" aria-labelledby="del-modal-title">
+        <div class="modal modal--danger" (click)="$event.stopPropagation()" style="max-width: 440px;">
+          <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--color-border);">
+            <h3 id="del-modal-title" class="modal-title" style="margin: 0; font-size: 16px; font-weight: 600; color: #DC2626;">Delete Project</h3>
+            <button class="modal-close" (click)="cancelDelete()" aria-label="Close" style="background: transparent; border: none; cursor: pointer; color: var(--color-text-muted);">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div class="modal-body" style="padding: 18px 20px; font-size: 13.5px; color: var(--color-text); line-height: 1.5;">
+            <p style="margin: 0 0 8px;">Are you sure you want to delete <strong>{{ state.project()?.name }}</strong>?</p>
+            <p style="margin: 0; color: var(--color-text-muted); font-size: 12.5px;">This action is permanent and will remove all profiling, written content, design assets, and task data for this project.</p>
+          </div>
+          <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--color-border); background: var(--color-surface-raised);">
+            <button type="button" class="btn-cancel" (click)="cancelDelete()" [disabled]="deleting()" style="height: 32px; padding: 0 14px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: transparent; cursor: pointer; font-size: 12.5px; color: var(--color-text-secondary);">Cancel</button>
+            <button type="button" class="btn-danger-confirm" (click)="deleteProject()" [disabled]="deleting()">
+              {{ deleting() ? 'Deleting…' : 'Yes, Delete Project' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    }
   `,
   styles: [`
     .loading-state {
@@ -483,7 +515,13 @@ import { ProjectStateService } from '../../services/project-state.service';
     .comp-name { font-size: 13px; font-weight: 600; color: var(--color-text); }
     .comp-link { color: var(--color-text-muted); text-decoration: none; display: flex; align-items: center; transition: color 0.12s; }
     .comp-link:hover { color: var(--color-accent); }
-    .comp-detail { font-size: 12px; color: var(--color-text-secondary); margin: 0; line-height: 1.5; }
+    .btn-delete-proj { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: var(--radius-md, 6px); border: 1px solid var(--color-border, #E2E8F0); background: transparent; color: var(--color-text-secondary); font-family: var(--font-sans); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s ease; }
+    .btn-delete-proj:hover { border-color: #EF4444; color: #DC2626; background: #FEF2F2; }
+    .btn-danger-confirm { height: 32px; padding: 0 16px; border-radius: var(--radius-md, 6px); border: none; background: #DC2626; color: #fff; font-family: var(--font-sans); font-size: 12.5px; font-weight: 600; cursor: pointer; transition: opacity 0.15s ease; }
+    .btn-danger-confirm:hover { opacity: 0.9; }
+    .btn-danger-confirm:disabled { opacity: 0.6; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .modal { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); width: 100%; box-shadow: var(--shadow-card); overflow: hidden; }
 
     @media (max-width: 768px) {
       .meta-row { grid-template-columns: 1fr; }
@@ -493,9 +531,40 @@ import { ProjectStateService } from '../../services/project-state.service';
 })
 export class ProjectDetail implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private projectService = inject(ProjectService);
   protected state = inject(ProjectStateService);
+  private notifService = inject(NotificationService);
   private routeSub?: Subscription;
+
+  protected showDeleteModal = signal(false);
+  protected deleting = signal(false);
+
+  protected confirmDelete() {
+    this.showDeleteModal.set(true);
+  }
+
+  protected cancelDelete() {
+    this.showDeleteModal.set(false);
+  }
+
+  protected deleteProject() {
+    const project = this.state.project();
+    if (!project || this.deleting()) return;
+    this.deleting.set(true);
+    this.projectService.deleteProject(project.id).subscribe({
+      next: () => {
+        this.deleting.set(false);
+        this.showDeleteModal.set(false);
+        this.notifService.toast(`Project "${project.name}" deleted successfully`, 'success');
+        this.router.navigateByUrl('/app/projects');
+      },
+      error: (err) => {
+        this.deleting.set(false);
+        this.notifService.toast(err?.error?.error ?? 'Failed to delete project', 'warning');
+      }
+    });
+  }
 
   protected loadError = computed(() => this.state.loading() ? null : (this.state.project() ? null : this._error));
   private _error: string | null = null;

@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { Badge } from '../../ui';
 import { ProjectService } from '../../services/project.service';
+import { NotificationService } from '../../services/notification.service';
 import { Project, ProjectStatus, PipelineStage } from '../../models/project.models';
 
 const STAGE_LABELS: Record<PipelineStage, string> = {
@@ -98,10 +99,24 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
               [attr.aria-label]="project.name + ' — ' + project.clientName"
             >
               <div class="card-top">
-                <div class="client-badge">{{ project.clientName.slice(0, 2).toUpperCase() }}</div>
-                <ui-badge [variant]="statusVariant(project.status)">
-                  {{ statusLabel(project.status) }}
-                </ui-badge>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <div class="client-badge">{{ project.clientName.slice(0, 2).toUpperCase() }}</div>
+                  <ui-badge [variant]="statusVariant(project.status)">
+                    {{ statusLabel(project.status) }}
+                  </ui-badge>
+                </div>
+                <button
+                  type="button"
+                  class="card-delete-btn"
+                  (click)="confirmDeleteProject($event, project)"
+                  title="Delete project"
+                  aria-label="Delete project"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
+                </button>
               </div>
 
               <div class="card-body">
@@ -238,6 +253,30 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    }
+
+    <!-- Delete Confirmation Modal -->
+    @if (projectToDelete()) {
+      <div class="modal-backdrop" (click)="cancelDelete()" role="dialog" aria-modal="true">
+        <div class="modal modal--danger" (click)="$event.stopPropagation()" style="max-width: 440px;">
+          <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--color-border);">
+            <h3 class="modal-title" style="margin: 0; font-size: 16px; font-weight: 600; color: #DC2626;">Delete Project</h3>
+            <button class="modal-close" (click)="cancelDelete()" aria-label="Close" style="background: transparent; border: none; cursor: pointer; color: var(--color-text-muted);">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div class="modal-body" style="padding: 18px 20px; font-size: 13.5px; color: var(--color-text); line-height: 1.5;">
+            <p style="margin: 0 0 8px;">Are you sure you want to delete <strong>{{ projectToDelete()?.name }}</strong>?</p>
+            <p style="margin: 0; color: var(--color-text-muted); font-size: 12.5px;">This action cannot be undone. All project data will be permanently removed.</p>
+          </div>
+          <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--color-border); background: var(--color-surface-raised);">
+            <button type="button" class="btn-cancel" (click)="cancelDelete()" [disabled]="deleting()" style="height: 32px; padding: 0 14px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: transparent; cursor: pointer; font-size: 12.5px; color: var(--color-text-secondary);">Cancel</button>
+            <button type="button" class="btn-danger-confirm" (click)="deleteProject()" [disabled]="deleting()" style="height: 32px; padding: 0 16px; border-radius: var(--radius-md); border: none; background: #DC2626; color: #fff; font-size: 12.5px; font-weight: 600; cursor: pointer;">
+              {{ deleting() ? 'Deleting…' : 'Yes, Delete Project' }}
+            </button>
+          </div>
         </div>
       </div>
     }
@@ -530,11 +569,14 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
     }
     .btn-submit:hover { background: var(--color-primary-hover); }
     .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+    .card-delete-btn { width: 28px; height: 28px; border-radius: 6px; border: none; background: transparent; color: var(--color-text-muted); display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0.6; transition: all 0.15s ease; }
+    .card-delete-btn:hover { opacity: 1; background: #FEF2F2; color: #DC2626; }
   `]
 })
 export class Projects implements OnInit {
   private projectService = inject(ProjectService);
   private fb = inject(FormBuilder);
+  protected notifService = inject(NotificationService);
 
   protected activeTab   = signal<'all' | ProjectStatus>('all');
   protected stageFilter = signal<'all' | PipelineStage>('all');
@@ -545,6 +587,37 @@ export class Projects implements OnInit {
   protected showModal   = signal(false);
   protected creating    = signal(false);
   protected createError = signal<string | null>(null);
+
+  protected projectToDelete = signal<Project | null>(null);
+  protected deleting = signal(false);
+
+  protected confirmDeleteProject(event: Event, project: Project) {
+    event.stopPropagation();
+    event.preventDefault();
+    this.projectToDelete.set(project);
+  }
+
+  protected cancelDelete() {
+    this.projectToDelete.set(null);
+  }
+
+  protected deleteProject() {
+    const p = this.projectToDelete();
+    if (!p || this.deleting()) return;
+    this.deleting.set(true);
+    this.projectService.deleteProject(p.id).subscribe({
+      next: () => {
+        this.deleting.set(false);
+        this.projectToDelete.set(null);
+        this.projects.update(list => list.filter(item => item.id !== p.id));
+        this.notifService.toast(`Project "${p.name}" deleted successfully`, 'success');
+      },
+      error: (err) => {
+        this.deleting.set(false);
+        this.notifService.toast(err?.error?.error ?? 'Failed to delete project', 'warning');
+      }
+    });
+  }
 
   protected stageOptions = [
     { label: 'Profiling',       value: 'PROFILING'       as PipelineStage, color: '#3B82F6' },
